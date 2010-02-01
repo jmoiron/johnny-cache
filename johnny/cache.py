@@ -29,7 +29,7 @@ class KeyGen(object):
         key = md5()
         for v in values:
             key.update(str(v))
-        return 'jc_multi_%s'%v.hexdigest()
+        return 'jc_multi_%s'%key.hexdigest()
 
 class KeyHandler(object):
     """Handles pulling and invalidating the key from
@@ -76,7 +76,7 @@ class QueryCacheBackend(object):
     Each time a model is update the keys are regenerated in the cache
     invalidation the cache for that model and all dependent queries."""
     def __init__(self, cache_backend, keyhandler=KeyHandler, keygen=KeyGen):
-        self.keyhandler= keyhandler(keygen())
+        self.keyhandler= keyhandler(cache_backend, keygen)
         self.cache_backend = cache_backend
         self._patched = False
 
@@ -94,7 +94,10 @@ class QueryCacheBackend(object):
             else:
                 val = original(cl, *args, **kwargs)
                 if hasattr(val, '__iter__'):
-                    #Can't permanently cache lazy iterables
+                    #Can't permanently cache lazy iterables without creating
+                    #a cacheable data structure. Note that this makes them
+                    #no longer lazy...
+                    #todo - create a smart iterable wrapper
                     val = [i for i in val]
                 self.cache_backend.set(key, val)
             return val
