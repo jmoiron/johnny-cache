@@ -2,6 +2,8 @@ from django.db import models
 from django.db.models import permalink
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.utils.translation import ugettext_lazy as _
+
 #from basic.people.models import Person
 
 class PersonType(models.Model):
