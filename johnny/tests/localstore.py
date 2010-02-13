@@ -7,7 +7,7 @@ that it be tested thoroughly to make sure no changes introduce the possibility
 of stale data in the cache."""
 
 from django.test import TestCase
-import localstore
+from johnny import localstore
 
 class LocalStoreTest(TestCase):
     def test_basic_operation(self):
