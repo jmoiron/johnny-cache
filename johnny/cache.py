@@ -6,7 +6,7 @@
 from uuid import uuid4
 try:
     from hashlib import md5
-except:
+except ImportError:
     from md5 import md5
 
 class KeyGen(object):
@@ -14,7 +14,7 @@ class KeyGen(object):
     for tables."""
 
     def random_generator(self):
-        #creates a random unique id
+        """Creates a random unique id."""
         key = md5()
         rand = str(uuid4())
         key.update(rand)
@@ -43,8 +43,8 @@ class KeyHandler(object):
         self.keygen = keygen()
         self.cache_backend = cache_backend
 
-    def get_table_generation(self, table):
-        """Creates a random generation value for a table name"""
+    def get_single_generation(self, table):
+        """Creates a random generation value for a single table name"""
         key = self.keygen.gen_table_key(table)
         val = self.cache_backend.get(key, None)
         if val == None:
@@ -57,7 +57,7 @@ class KeyHandler(object):
         value for the generation"""
         generations = []
         for table in tables:
-            generations += self.get_table_generation(table)
+            generations += self.get_single_generation(table)
         key = self.keygen.gen_multi_key(generations)
         val = self.cache_backend.get(key, None)
         if val == None:
@@ -74,6 +74,9 @@ class KeyHandler(object):
         self.cache_backend.set(key, val)
         return val
 
+# TODO: This QueryCacheBackend is for 1.2;  we need to write one for 1.1 as well
+# we can test them out by using different virtualenvs pretty quickly
+
 class QueryCacheBackend(object):
     """This class is engine behind the query cache. It reads the queries
     going through the django Query and returns from the cache using
@@ -89,7 +92,7 @@ class QueryCacheBackend(object):
         def newfun(cl, *args, **kwargs):
             tables = cl.query.tables
             if len(tables) == 1:
-                key = self.keyhandler.get_table_generation(tables[0])
+                key = self.keyhandler.get_single_generation(tables[0])
             else:
                 key = self.keyhandler.get_multi_generation(tables)
 
