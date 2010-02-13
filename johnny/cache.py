@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""Johnny's main caching functionality."""
+
 from uuid import uuid4
 try:
     from hashlib import md5
@@ -48,7 +53,7 @@ class KeyHandler(object):
         return val
 
     def get_multi_generation(self, tables):
-        """Takes a list of table names and returns an aggregate 
+        """Takes a list of table names and returns an aggregate
         value for the generation"""
         generations = []
         for table in tables:
@@ -120,5 +125,5 @@ class QueryCacheBackend(object):
                 reader.execute_sql = self._monkey_select(reader.execute_sql)
             for updater in (sql.SQLInsertCompiler, sql.SQLDeleteCompiler, sql.SQLUpdateCompiler):
                 updater.execute_sql = self._monkey_write(updater.execute_sql)
-            self.patched = True
+            self._patched = True
 
