@@ -147,11 +147,24 @@ class QueryCacheBackend(object):
         """monkey patches django.db.models.sql.compiler.SQL*Compiler series"""
         if not self._patched:
             from django.db.models import sql
+            self._original = {}
             for reader in (sql.SQLCompiler, sql.SQLAggregateCompiler, sql.DateCompiler):
+                self._original[reader] = reader.execute_sql
                 reader.execute_sql = self._monkey_select(reader.execute_sql)
             for updater in (sql.SQLInsertCompiler, sql.SQLDeleteCompiler, sql.SQLUpdateCompiler):
+                self._original[updater] = updater.execute_sql
                 updater.execute_sql = self._monkey_write(updater.execute_sql)
             self._patched = True
+
+    def unpatch(self):
+        """un-applies this patch."""
+        if not self._patched:
+            return
+        from django.db.models import sql
+        for func in (sql.SQLCompiler, sql.SQLAggregateCompiler, sql.DateCompiler,
+                sql.SQLInsertCompiler, sql.SQLDeleteCompiler, sql.SQLUpdateCompiler):
+            func.execute_sql = self._original[func]
+        self._patched = False
 
 class QueryCacheBackend11(QueryCacheBackend):
     """This is the 1.1.x version of the QueryCacheBackend.  In Django1.1, we
@@ -214,11 +227,18 @@ class QueryCacheBackend11(QueryCacheBackend):
             result = list(result)
             self.cache_backend.set(key, result)
             return result
-        return original
+        return newfun
 
     def patch(self):
         if not self._patched:
             from django.db.models import sql
+            self._original = sql.Query.execute_sql
             sql.Query.execute_sql = self._monkey_execute_sql(sql.Query.execute_sql)
             self._patched = True
+
+    def unpatch(self):
+        if not self._patched:
+            return
+        sql.Query.execute_sql = self._original
+        self._patched = False
 
