@@ -10,36 +10,39 @@ try:
 except ImportError:
     from md5 import md5
 
+# The KeyGen is used only to generate keys.  Some of these keys will be used
+# directly in the cache, while others are only general purpose functions to
+# generate hashes off of one or more values.
+
 class KeyGen(object):
-    """This class is responsible for creating the QueryCache keys
-    for tables."""
+    """This class is responsible for generating keys."""
 
     def random_generator(self):
         """Creates a random unique id."""
-        key = md5()
-        rand = str(uuid4())
-        key.update(rand)
-        return key.hexdigest()
+        return self.gen_key(str(uuid4()))
 
     def gen_table_key(self, table):
-        """Returns a key that is standard for a table name
-        Total length up to 242 (max for memcache is 250)"""
+        """Returns a key that is standard for a given table name.
+        Total length up to 242 (max for memcache is 250)."""
         if len(table) > 200:
-            m = md5()
-            m.update(table[200:])
-            table = table[0:200] + m.hexdigest()
-        return 'jc_table_%s'%str(table)
+            table = table[0:200] + self.gen_key(table[200:])
+        return 'jc_table_%s' % str(table)
 
     def gen_multi_key(self, values):
-        """Takes a list of generations (not table keys) and returns a key""""
+        """Takes a list of generations (not table keys) and returns a key."""
+        return 'jc_multi_%s' % self.gen_key(*values)
+
+    def gen_key(self, *values):
+        """Generate a key from one or more values."""
         key = md5()
         for v in values:
             key.update(str(v))
-        return 'jc_multi_%s'%key.hexdigest()
+        return key.hexdigest()
 
 class KeyHandler(object):
-    """Handles pulling and invalidating the key from
-    from the cache based on the table names."""
+    """Handles pulling and invalidating the key from from the cache based
+    on the table names.  Higher-level logic dealing with johnny cache specific
+    keys go in this class."""
     def __init__(self, cache_backend, keygen=KeyGen):
         self.keygen = keygen()
         self.cache_backend = cache_backend
@@ -81,6 +84,13 @@ class KeyHandler(object):
         self.cache_backend.set(key, val)
         return val
 
+    def sql_key(self, generation, sql, params, order, result_type):
+        """Return the specific cache key for the sql query described by the
+        pieces of the query and the generation key."""
+        # these keys will always look pretty opaque
+        key = 'jc_query_%s.%s' % (generation, self.keygen.gen_key(sql, params,
+                order, result_type))
+
 # TODO: This QueryCacheBackend is for 1.2;  we need to write one for 1.1 as well
 # we can test them out by using different virtualenvs pretty quickly
 
@@ -104,7 +114,10 @@ class QueryCacheBackend(object):
     def _monkey_select(self, original):
         @wraps(original)
         def newfun(cls, *args, **kwargs):
-            key = self.keyhandler.get_generation(*cls.query.tables)
+            # TODO: we need to get the sql stuff here to get the real key
+            gen_key = self.keyhandler.get_generation(*cls.query.tables)
+            # XXX: this has to create a sql key off the keyhandler
+            key = gen_key
             val = self.cache_backend.get(key, None)
             if val != None:
                 return val
@@ -160,14 +173,18 @@ class QueryCacheBackend11(QueryCacheBackend):
                 if result_type == MULTI:
                     return query.empty_iter()
 
-            # check the cache for this queryset
-            key = self.keyhandler.get_generation(*cls.tables)
+            # get the cache key for the current generation + this query set
+            gen_key = self.keyhandler.get_generation(*cls.tables)
+            key = self.keyhandler.get_sql(gen_key, sql, params,
+                    cls.ordering_aliases, result_type)
             val = self.cache_backend.get(key, None)
 
             if val is not None:
-                # in the original code, this is a special path.. what does it do?
-                if not (cls.ordering_aliases and result_type == SINGLE):
-                    return val
+                # the ordering_aliases is a special path in the original code,
+                # but we're including it in our key above.. is that enough?
+                return val
+                #if not (cls.ordering_aliases and result_type == SINGLE):
+                #    return val
 
             # we didn't find the value in the cache, so execute the query
 
@@ -204,3 +221,4 @@ class QueryCacheBackend11(QueryCacheBackend):
             from django.db.models import sql
             sql.Query.execute_sql = self._monkey_execute_sql(sql.Query.execute_sql)
             self._patched = True
+
