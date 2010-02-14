@@ -3,6 +3,7 @@
 
 """Johnny's main caching functionality."""
 
+import sys
 from functools import wraps
 from uuid import uuid4
 try:
@@ -50,8 +51,8 @@ class KeyHandler(object):
     def get_generation(self, *tables):
         """Get the generation key for any number of tables."""
         if len(tables) > 1:
-            return self.get_multi_generation(self, tables)
-        return self.get_single_generation(self, tables[0])
+            return self.get_multi_generation(tables)
+        return self.get_single_generation(tables[0])
 
     def get_single_generation(self, table):
         """Creates a random generation value for a single table name"""
@@ -90,6 +91,7 @@ class KeyHandler(object):
         # these keys will always look pretty opaque
         key = 'jc_query_%s.%s' % (generation, self.keygen.gen_key(sql, params,
                 order, result_type))
+        return key
 
 # TODO: This QueryCacheBackend is for 1.2;  we need to write one for 1.1 as well
 # we can test them out by using different virtualenvs pretty quickly
@@ -106,7 +108,7 @@ class QueryCacheBackend(object):
     QueryCacheMiddleware automatically selects the right QueryCacheBackend."""
     __shared_state = {}
     def __init__(self, cache_backend, keyhandler=KeyHandler, keygen=KeyGen):
-        self.__dict__ = __shared_state
+        self.__dict__ = self.__shared_state
         self.keyhandler= keyhandler(cache_backend, keygen)
         self.cache_backend = cache_backend
         self._patched = getattr(self, '_patched', False)
@@ -166,6 +168,22 @@ class QueryCacheBackend(object):
             func.execute_sql = self._original[func]
         self._patched = False
 
+    def invalidate(self, instance, **kwargs):
+        if self._patched:
+            self.keyhandler.invalidate_table(instance._meta.db_table)
+
+    def _handle_signals(self):
+        from django.db.models import signals
+        signals.post_save.connect(self.invalidate, sender=None)
+        signals.post_delete.connect(self.invalidate, sender=None)
+
+    def flush_query_cache(self):
+        from django.db import connection
+        tables = connection.introspection.table_names()
+        #seen_models = connection.introspection.installed_models(tables)
+        for table in tables:
+            self.keyhandler.invalidate_table(table)
+
 class QueryCacheBackend11(QueryCacheBackend):
     """This is the 1.1.x version of the QueryCacheBackend.  In Django1.1, we
     patch django.db.models.sql.query.Query.execute_sql to implement query
@@ -173,7 +191,7 @@ class QueryCacheBackend11(QueryCacheBackend):
     __shared_state = {}
     def _monkey_execute_sql(self, original):
         from django.db.models.sql import query
-        from django.db.models.sql.constants import *  # MULTI, SINGLE, etc
+        from django.db.models.sql.constants import MULTI, SINGLE
         from django.db.models.sql.datastructures import EmptyResultSet
 
         @wraps(original)
@@ -187,22 +205,27 @@ class QueryCacheBackend11(QueryCacheBackend):
                     return query.empty_iter()
 
             # get the cache key for the current generation + this query set
-            gen_key = self.keyhandler.get_generation(*cls.tables)
-            key = self.keyhandler.get_sql(gen_key, sql, params,
-                    cls.ordering_aliases, result_type)
-            val = self.cache_backend.get(key, None)
+            if cls.tables: # on INSERT statements, this isn't set...
+                gen_key = self.keyhandler.get_generation(*cls.tables)
+                key = self.keyhandler.sql_key(gen_key, sql, params,
+                        cls.ordering_aliases, result_type)
+                val = self.cache_backend.get(key, None)
 
-            if val is not None:
-                # the ordering_aliases is a special path in the original code,
-                # but we're including it in our key above.. is that enough?
-                return val
-                #if not (cls.ordering_aliases and result_type == SINGLE):
-                #    return val
+                if val is not None:
+                    # the ordering_aliases is a special path in the original code,
+                    # but we're including it in our key above.. is that enough?
+                    return val
+                    #if not (cls.ordering_aliases and result_type == SINGLE):
+                    #    return val
 
-            # we didn't find the value in the cache, so execute the query
+                # we didn't find the value in the cache, so execute the query
+            # uncomment below to make sure that only INSERTs are bypassing cache
+            elif sql.startswith('INSERT') and 'django_content_type' in sql:
+                pass #from ipdb import set_trace; set_trace()
 
             cursor = cls.connection.cursor()
             cursor.execute(sql, params)
+
 
             if not result_type:
                 return cursor
@@ -213,6 +236,7 @@ class QueryCacheBackend11(QueryCacheBackend):
                 result = cursor.fetchone()
                 self.cache.set(key, result)
                 return result
+            #from ipdb import set_trace; set_trace()
 
             if cls.ordering_aliases:
                 result = query.order_modified_iter(cursor, len(cls.ordering_aliases),
@@ -224,21 +248,28 @@ class QueryCacheBackend11(QueryCacheBackend):
             # the query result into the cache;  however, is there a way we could
             # provide an iter that would cache automatically upon read?  Would
             # this less-greedy caching strategy actually be worse in the common case?
-            result = list(result)
-            self.cache_backend.set(key, result)
+            if cls.tables:
+                result = list(result)
+                self.cache_backend.set(key, result)
             return result
         return newfun
 
     def patch(self):
-        if not self._patched:
-            from django.db.models import sql
-            self._original = sql.Query.execute_sql
-            sql.Query.execute_sql = self._monkey_execute_sql(sql.Query.execute_sql)
-            self._patched = True
+        from django.db.models import sql
+        if self._patched:
+            return
+        print "Patching execute_sql (1.1)"
+        self._original = sql.Query.execute_sql
+        sql.Query.execute_sql = self._monkey_execute_sql(sql.Query.execute_sql)
+        self._handle_signals()
+        self._patched = True
 
     def unpatch(self):
+        from django.db.models import sql
         if not self._patched:
             return
+        print "Unpatching execute_sql (1.1)"
         sql.Query.execute_sql = self._original
         self._patched = False
+
 

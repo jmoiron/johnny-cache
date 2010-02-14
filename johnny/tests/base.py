@@ -21,8 +21,11 @@ class JohnnyTestCase(TestCase):
         )
         # load our fake application and syncdb
         load_app(test_app)
+        print 'syncdb'
         call_command('syncdb', verbosity=0, interactive=False)
+        super(JohnnyTestCase, self).setUp()
 
     def tearDown(self):
         settings.INSTALLED_APPS = self.saved_INSTALLED_APPS
+        super(JohnnyTestCase, self).tearDown()
 
