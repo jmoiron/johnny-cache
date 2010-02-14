@@ -9,7 +9,7 @@ from johnny import middleware
 import base
 
 # put tests in here to be included in the testing suite
-__all__ = ['SimpleJohnnyTest',]
+__all__ = ['SingleModelTest',]
 
 class QueryCacheBase(base.JohnnyTestCase):
     def setUp(self):
@@ -24,15 +24,17 @@ class QueryCacheBase(base.JohnnyTestCase):
         super(QueryCacheBase, self).tearDown()
 
 
-class SimpleJohnnyTest(QueryCacheBase):
-    fixtures = base.johnny_fixtures
-
-    def test_basic_nonsense(self):
-        pass
-
-class SingleItemGetTest(QueryCacheBase):
+class SingleModelTest(QueryCacheBase):
+    # XXX: the fixtures aren't loading...?
     fixtures = base.johnny_fixtures
 
     def test_basic_querycaching(self):
-        print "Hello!"
+        from django.core.management import call_command
+        from testapp.models import Publisher
+        connection.queries = []
+        starting_count = Publisher.objects.count()
+        starting_count = Publisher.objects.count()
+        # make sure that doing this twice doesn't hit the db twice
+        self.failUnless(len(connection.queries) == 1)
+        from ipdb import set_trace; set_trace()
 

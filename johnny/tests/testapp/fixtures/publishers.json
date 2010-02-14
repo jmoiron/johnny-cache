@@ -1,6 +1,6 @@
 [
   {
-    "model" : "books.publisher",
+    "model" : "testapp.publisher",
     "pk" : 1,
     "fields" : {
       "title" : "Random House",

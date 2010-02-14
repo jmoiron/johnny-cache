@@ -234,7 +234,7 @@ class QueryCacheBackend11(QueryCacheBackend):
                     return cursor.fetchone()[:-len(cls.ordering_aliases)]
                 # otherwise, cache the value and return
                 result = cursor.fetchone()
-                self.cache.set(key, result)
+                self.cache_backend.set(key, result)
                 return result
             #from ipdb import set_trace; set_trace()
 
@@ -258,7 +258,7 @@ class QueryCacheBackend11(QueryCacheBackend):
         from django.db.models import sql
         if self._patched:
             return
-        print "Patching execute_sql (1.1)"
+        #print "Patching execute_sql (1.1)"
         self._original = sql.Query.execute_sql
         sql.Query.execute_sql = self._monkey_execute_sql(sql.Query.execute_sql)
         self._handle_signals()
@@ -268,7 +268,7 @@ class QueryCacheBackend11(QueryCacheBackend):
         from django.db.models import sql
         if not self._patched:
             return
-        print "Unpatching execute_sql (1.1)"
+        #print "Unpatching execute_sql (1.1)"
         sql.Query.execute_sql = self._original
         self._patched = False
 

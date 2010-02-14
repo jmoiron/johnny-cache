@@ -1,6 +1,6 @@
 [
   {
-    "model" : "books.genre",
+    "model" : "testapp.genre",
     "pk" : 1,
     "fields" : {
       "title" : "Architecture",

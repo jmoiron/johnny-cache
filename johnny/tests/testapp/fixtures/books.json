@@ -1,6 +1,6 @@
 [
   {
-    "model" : "books.book",
+    "model" : "testapp.book",
     "pk" : 1,
     "fields" : {
       "title" : "Death and Life of Great American Cities",

@@ -1,6 +1,6 @@
 [
   {
-    "model" : "people.persontype",
+    "model" : "testapp.persontype",
     "pk" : 1,
     "fields" : {
       "title" : "Author",
@@ -8,7 +8,7 @@
     }
   },
   {
-    "model" : "people.person",
+    "model" : "testapp.person",
     "pk" : 1,
     "fields" : {
       "first_name": "Jane",
