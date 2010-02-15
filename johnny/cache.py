@@ -226,7 +226,6 @@ class QueryCacheBackend11(QueryCacheBackend):
             cursor = cls.connection.cursor()
             cursor.execute(sql, params)
 
-
             if not result_type:
                 return cursor
             if result_type == SINGLE:
