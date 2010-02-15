@@ -10,10 +10,14 @@ from django.conf import settings
 from django.core.management import call_command
 from django.db.models.loading import load_app
 
-johnny_fixtures = ['authors.json', 'books.json', 'genres.json', 'publishers.json']
+# order matters here;  I guess we aren't deferring foreign key checking :\
+johnny_fixtures = ['authors.json', 'genres.json', 'publishers.json', 'books.json']
 
 class JohnnyTestCase(TestCase):
-    def setUp(self):
+    def __init__(self, *args, **kwargs):
+        super(JohnnyTestCase, self).__init__(*args, **kwargs)
+
+    def _pre_setup(self):
         self.saved_INSTALLED_APPS = settings.INSTALLED_APPS
         self.saved_DEBUG = settings.DEBUG
         test_app = 'johnny.tests.testapp'
@@ -24,10 +28,11 @@ class JohnnyTestCase(TestCase):
         # load our fake application and syncdb
         load_app(test_app)
         call_command('syncdb', verbosity=0, interactive=False)
-        super(JohnnyTestCase, self).setUp()
+        self.fixtures = getattr(self, 'fixtures', [])
+        super(JohnnyTestCase, self)._pre_setup()
 
-    def tearDown(self):
+    def _post_teardown(self):
         settings.INSTALLED_APPS = self.saved_INSTALLED_APPS
         settings.DEBUG = self.saved_DEBUG
-        super(JohnnyTestCase, self).tearDown()
+        super(JohnnyTestCase, self)._post_teardown()
 

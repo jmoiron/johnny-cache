@@ -12,20 +12,19 @@ import base
 __all__ = ['SingleModelTest',]
 
 class QueryCacheBase(base.JohnnyTestCase):
-    def setUp(self):
+    def _pre_setup(self):
         self.saved_DISABLE_SETTING = getattr(settings, 'DISABLE_GENERATIONAL_CACHE', False)
         self.DISABLE_GENERATIONAL_CACHE = False
         self.middleware = middleware.QueryCacheMiddleware()
-        super(QueryCacheBase, self).setUp()
+        super(QueryCacheBase, self)._pre_setup()
 
-    def tearDown(self):
+    def _post_teardown(self):
         self.middleware.unpatch()
         self.DISABLE_GENERATIONAL_CACHE = self.saved_DISABLE_SETTING
-        super(QueryCacheBase, self).tearDown()
+        super(QueryCacheBase, self)._post_teardown()
 
 
 class SingleModelTest(QueryCacheBase):
-    # XXX: the fixtures aren't loading...?
     fixtures = base.johnny_fixtures
 
     def test_basic_querycaching(self):
@@ -36,5 +35,5 @@ class SingleModelTest(QueryCacheBase):
         starting_count = Publisher.objects.count()
         # make sure that doing this twice doesn't hit the db twice
         self.failUnless(len(connection.queries) == 1)
-        from ipdb import set_trace; set_trace()
+        self.failUnless(len(starting_count) == 1)
 
