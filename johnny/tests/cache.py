@@ -35,5 +35,5 @@ class SingleModelTest(QueryCacheBase):
         starting_count = Publisher.objects.count()
         # make sure that doing this twice doesn't hit the db twice
         self.failUnless(len(connection.queries) == 1)
-        self.failUnless(len(starting_count) == 1)
+        self.failUnless(starting_count == 1)
 

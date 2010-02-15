@@ -14,9 +14,6 @@ from django.db.models.loading import load_app
 johnny_fixtures = ['authors.json', 'genres.json', 'publishers.json', 'books.json']
 
 class JohnnyTestCase(TestCase):
-    def __init__(self, *args, **kwargs):
-        super(JohnnyTestCase, self).__init__(*args, **kwargs)
-
     def _pre_setup(self):
         self.saved_INSTALLED_APPS = settings.INSTALLED_APPS
         self.saved_DEBUG = settings.DEBUG
@@ -28,7 +25,6 @@ class JohnnyTestCase(TestCase):
         # load our fake application and syncdb
         load_app(test_app)
         call_command('syncdb', verbosity=0, interactive=False)
-        self.fixtures = getattr(self, 'fixtures', [])
         super(JohnnyTestCase, self)._pre_setup()
 
     def _post_teardown(self):
