@@ -1,6 +1,8 @@
 syntax: glob
 
 tags
+django
+local_settings.py
 *.pyc
 *.swp
 *.egg-info*
