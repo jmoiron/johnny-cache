@@ -14,7 +14,7 @@ class QueryCacheMiddleware(object):
     querysets created via the ORM.  This should be the first middleware
     in your middleware stack."""
     __state = {} # alex martinelli's borg pattern
-    def __init__(self): 
+    def __init__(self):
         self.__dict__ = self.__state
         from django.conf import settings
         self.disabled = getattr(settings, 'DISABLE_GENERATIONAL_CACHE', False)

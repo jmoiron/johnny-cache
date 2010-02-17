@@ -24,31 +24,30 @@ Settings
 The following settings can be used to disable different caching functionality
 for development purposes:
 
-* ``JOHNNY_CACHE_EXTENSIONS`` : a list of app strings that hook into the
-  generational cache.  The default is (``johnny.apps.QuerySetCache``,).
-
 * ``DISABLE_GENERATIONAL_CACHE`` : disables generational cache upkeep.
-
 * ``ENABLE_CACHE_STATS`` : enables cache statistics logging.
 
 Usage
 ~~~~~
 
-Generational Cache Upkeep
+Queryset Caching
+----------------
+
+The *Queryset Cache* is the main feature of ``johnny``.  It maintains the
+cache generation keys and caches *all* read queries based on the tables they
+hit and the statements themselves.  To enable the Queryset Cache, add
+``johnny.middleware.QueryCacheMiddleware`` to *the top* of your
+MIDDLEWARE_CLASSES setting.
+
+LocalStoreClearMiddleware
 -------------------------
 
-This is the foundation of ``johnny`` and must be enabled for any sub-app
-that requires it.  To enable the generational cache upkeep, install the
-``johnny.middleware.GenerationalCacheMiddleware``.  You can leave this
-middleware installed but disable its activities by using the
-``DISABLE_GENERATIONAL_CACHE`` setting.
-
-Queryset Cache
---------------
-
-The *Queryset Cache* is a generational 2-tiered caching system implemented as a
-sub-app of the generational cache.  The generational cache middleware applies a
-monkey-patch to the Django ORM, but also supplies hooks for other caching apps.
-To enable the Queryset Cache, add ``johnny.apps.QuerySetCache`` to the 
-``JOHNNY_CACHE_EXTENSIONS`` setting.
+The LocalStore cache is a thread-safe dict/object hybrid that lives in 
+``johnny.localstore.Cache`` and is cleared out by the LocalStoreClearMiddleware.
+This gives a "global" space to put various pieces of information, useful both
+as a per-request local cache (to prevent repeated trips to ``memcached``) as
+well as a standard place to put information like media registration, etc.
+The ``Cache`` object is created automatically, but to have it cleared at the
+end of each request add ``johnny.middleware.LocalStoreClearMiddleware`` to
+your MIDDLEWARE_CLASSES.
 
