@@ -14,5 +14,13 @@
       "title" : "Americana",
       "slug" : "americana"
     }
+  },
+  {
+    "model" : "testapp.genre",
+    "pk" : 3,
+    "fields" : {
+      "title" : "Historical",
+      "slug" : "historical"
+    }
   }
 ]

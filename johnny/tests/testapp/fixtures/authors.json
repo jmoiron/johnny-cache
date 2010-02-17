@@ -17,5 +17,16 @@
       "gender": 2,
       "person_types": [1]
     }
+  },
+  {
+    "model" : "testapp.person",
+    "pk" : 2,
+    "fields" : {
+      "first_name" : "Leo",
+      "last_name" : "Tolstoy",
+      "slug": "leo-tolstoy",
+      "gender": 1,
+      "person_types": [1]
+    }
   }
 ]

@@ -13,5 +13,19 @@
       "published" : "2007-11-25",
       "genre": [1]
     }
+  },
+  {
+    "model" : "testapp.book",
+    "pk" : 2,
+    "fields" : {
+      "title" : "War and Peace",
+      "prefix" : "",
+      "slug" : "war-and-peace",
+      "authors" : [2],
+      "isbn": "9780307266934",
+      "pages": 1296,
+      "published" : "2007-10-16",
+      "genre": [3]
+    }
   }
 ]
