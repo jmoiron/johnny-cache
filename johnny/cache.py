@@ -114,29 +114,42 @@ class QueryCacheBackend(object):
         self._patched = getattr(self, '_patched', False)
 
     def _monkey_select(self, original):
+        from django.db.models.sql import query
+        from django.db.models.sql.constants import MULTI, SINGLE
+        from django.db.models.sql.datastructures import EmptyResultSet
+
         @wraps(original)
-        def newfun(cls, *args, **kwargs):
-            # TODO: we need to get the sql stuff here to get the real key
+        def newfun(cls, result_type=MULTI, *args, **kwargs):
+            from django.db.models.sql import compiler
+            if type(cls) in (compiler.SQLInsertCompiler, compiler.SQLDeleteCompiler, compiler.SQLUpdateCompiler):
+                return original(cls, result_type, *args, **kwargs)
+            try:
+                sql, params = cls.as_sql()
+                if not sql:
+                    raise EmptyResultSet
+            except EmptyResultSet:
+                if result_type == MULTI:
+                    return query.empty_iter()
+
             gen_key = self.keyhandler.get_generation(*cls.query.tables)
-            # XXX: this has to create a sql key off the keyhandler
-            key = gen_key
+            key = self.keyhandler.sql_key(gen_key, sql, params, cls.get_ordering(), result_type)
             val = self.cache_backend.get(key, None)
             if val != None:
                 return val
             else:
-                val = original(cls, *args, **kwargs)
+                val = original(cls, result_type, *args, **kwargs)
                 if hasattr(val, '__iter__'):
                     #Can't permanently cache lazy iterables without creating
                     #a cacheable data structure. Note that this makes them
                     #no longer lazy...
                     #todo - create a smart iterable wrapper
-                    val = [i for i in val]
+                    val = list(val)
                 self.cache_backend.set(key, val)
             return val
         return newfun
 
     def _monkey_write(self, original):
-        @wraps(oringinal)
+        @wraps(original)
         def newfun(cls, *args, **kwargs):
             tables = cls.query.tables
             for table in tables:
@@ -148,12 +161,12 @@ class QueryCacheBackend(object):
     def patch(self):
         """monkey patches django.db.models.sql.compiler.SQL*Compiler series"""
         if not self._patched:
-            from django.db.models import sql
+            from django.db.models.sql import compiler
             self._original = {}
-            for reader in (sql.SQLCompiler, sql.SQLAggregateCompiler, sql.DateCompiler):
+            for reader in (compiler.SQLCompiler, compiler.SQLAggregateCompiler, compiler.SQLDateCompiler):
                 self._original[reader] = reader.execute_sql
                 reader.execute_sql = self._monkey_select(reader.execute_sql)
-            for updater in (sql.SQLInsertCompiler, sql.SQLDeleteCompiler, sql.SQLUpdateCompiler):
+            for updater in (compiler.SQLInsertCompiler, compiler.SQLDeleteCompiler, compiler.SQLUpdateCompiler):
                 self._original[updater] = updater.execute_sql
                 updater.execute_sql = self._monkey_write(updater.execute_sql)
             self._patched = True
