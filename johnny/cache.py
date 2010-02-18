@@ -151,10 +151,19 @@ class QueryCacheBackend(object):
     def _monkey_write(self, original):
         @wraps(original)
         def newfun(cls, *args, **kwargs):
-            tables = cls.query.tables
+            from django.db.models.sql import compiler
+            if type(cls) == compiler.SQLInsertCompiler:
+                tables = [cls.query.model._meta.db_table]
+            else:
+                tables = cls.query.tables
             for table in tables:
                 self.keyhandler.invalidate_table(table)
-            return original(cls, *args, **kwargs)
+            try:
+                return original(cls, *args, **kwargs)
+            except:
+                import pdb
+                pdb.set_trace()
+                return original(cls, *args, **kwargs)
         return newfun
 
 
@@ -175,10 +184,10 @@ class QueryCacheBackend(object):
         """un-applies this patch."""
         if not self._patched:
             return
-        from django.db.models import sql
-        for func in (sql.SQLCompiler, sql.SQLAggregateCompiler, sql.DateCompiler,
-                sql.SQLInsertCompiler, sql.SQLDeleteCompiler, sql.SQLUpdateCompiler):
-            func.execute_sql = self._original[func]
+        from django.db.models.sql import compiler
+        for func in (compiler.SQLCompiler, compiler.SQLAggregateCompiler, compiler.SQLDateCompiler,
+                compiler.SQLInsertCompiler, compiler.SQLDeleteCompiler, compiler.SQLUpdateCompiler):
+            func.execute_compiler = self._original[func]
         self._patched = False
 
     def invalidate(self, instance, **kwargs):
