@@ -17,7 +17,7 @@ class QueryCacheMiddleware(object):
     def __init__(self):
         self.__dict__ = self.__state
         from django.conf import settings
-        self.disabled = getattr(settings, 'DISABLE_GENERATIONAL_CACHE', False)
+        self.disabled = getattr(settings, 'DISABLE_QUERYSET_CACHE', False)
         self.installed = getattr(self, 'installed', False)
         if not self.installed and not self.disabled:
             self.query_cache_backend = self._get_backend()

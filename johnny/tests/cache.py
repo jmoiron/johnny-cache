@@ -13,14 +13,14 @@ __all__ = ['SingleModelTest', 'MultiModelTest']
 
 class QueryCacheBase(base.JohnnyTestCase):
     def _pre_setup(self):
-        self.saved_DISABLE_SETTING = getattr(settings, 'DISABLE_GENERATIONAL_CACHE', False)
-        settings.DISABLE_GENERATIONAL_CACHE = False
+        self.saved_DISABLE_SETTING = getattr(settings, 'DISABLE_QUERYSET_CACHE', False)
+        settings.DISABLE_QUERYSET_CACHE = False
         self.middleware = middleware.QueryCacheMiddleware()
         super(QueryCacheBase, self)._pre_setup()
 
     def _post_teardown(self):
         self.middleware.unpatch()
-        settings.DISABLE_GENERATIONAL_CACHE = self.saved_DISABLE_SETTING
+        settings.DISABLE_QUERYSET_CACHE = self.saved_DISABLE_SETTING
         super(QueryCacheBase, self)._post_teardown()
 
 

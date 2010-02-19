@@ -11,6 +11,8 @@ try:
 except ImportError:
     from md5 import md5
 
+from django.dispatch import Signal
+
 # The KeyGen is used only to generate keys.  Some of these keys will be used
 # directly in the cache, while others are only general purpose functions to
 # generate hashes off of one or more values.
@@ -293,4 +295,6 @@ class QueryCacheBackend11(QueryCacheBackend):
         sql.Query.execute_sql = self._original
         self._patched = False
 
-
+class signals(object):
+    qc_hit = Signal(providing_args=[])
+    qc_miss = Signal(providing_args=[])
