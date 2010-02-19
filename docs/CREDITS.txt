@@ -1,0 +1,10 @@
+_theme is using pip's version of the "nature" theme
+
+pip: http://pip.openplans.org/index.html
+
+the nature theme is called 'builtin' on sphinx's list of sites using other
+builtin themes, but not here:
+
+http://sphinx.pocoo.org/theming.html#builtin-themes
+
+
