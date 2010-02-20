@@ -11,7 +11,10 @@ try:
 except ImportError:
     from md5 import md5
 
+import localstore
 import signals
+
+local = localstore.LocalStore()
 
 def get_backend(cache_backend=None):
     """Get's a QueryCacheBackend for the current version of django using the
