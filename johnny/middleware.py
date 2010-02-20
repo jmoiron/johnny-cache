@@ -29,3 +29,14 @@ class QueryCacheMiddleware(object):
         self.query_cache_backend.flush_query_cache()
         self.installed = False
 
+class LocalStoreClearMiddleware(object):
+    """This middleware clears the localstore cache in `johnny.cache.local`
+    at the end of every request."""
+    def process_exception(self, *args, **kwargs):
+        cache.local.clear()
+        raise
+
+    def process_response(req, resp):
+        cache.local.clear()
+        return resp
+
