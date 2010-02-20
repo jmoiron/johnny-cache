@@ -124,10 +124,17 @@ class QueryCacheBackend(object):
     Note that this version of the QueryCacheBackend is for django 1.2; the
     QueryCacheMiddleware automatically selects the right QueryCacheBackend."""
     __shared_state = {}
-    def __init__(self, cache_backend, keyhandler=KeyHandler, keygen=KeyGen):
+    def __init__(self, cache_backend=None, keyhandler=None, keygen=None):
         self.__dict__ = self.__shared_state
-        self.keyhandler= keyhandler(cache_backend, keygen)
-        self.cache_backend = cache_backend
+        if cache_backend is None and not hasattr(self, 'cache_backend'):
+            from django.core.cache import cache as cache_backend
+        if keygen is None and not hasattr(self, 'keygen'):
+            keygen = KeyGen
+        if keyhandler is None and not hasattr(self, 'keyhandler'):
+            keyhandler = KeyHandler
+        if keyhandler: assert(keygen)
+        self.cache_backend = cache_backend if cache_backend else self.cache_backend
+        self.keyhandler = keyhandler(cache_backend, keygen) if keygen and keyhandler else self.keyhandler
         self._patched = getattr(self, '_patched', False)
 
     def _monkey_select(self, original):
