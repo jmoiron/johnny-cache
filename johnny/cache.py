@@ -37,15 +37,21 @@ class KeyGen(object):
         """Creates a random unique id."""
         return self.gen_key(str(uuid4()))
 
-    def gen_table_key(self, table):
-        """Returns a key that is standard for a given table name.
-        Total length up to 242 (max for memcache is 250)."""
-        if len(table) > 200:
-            table = table[0:200] + self.gen_key(table[200:])
-        return 'jc_table_%s' % str(table)
+    def gen_table_key(self, table, db='default'):
+        """Returns a key that is standard for a given table name and database alias.
+        Total length up to 212 (max for memcache is 250)."""
+        table = str(table)
+        db = str(db)
+        if len(table) > 100:
+            table = table[0:68] + self.gen_key(table[68:])
+        if db and len(db) > 100:
+            db = db[0:68] + self.gen_key(db[68:])
+        return 'jc_table_%s_%s' % (db, table)
 
-    def gen_multi_key(self, values):
+    def gen_multi_key(self, values, db='default'):
         """Takes a list of generations (not table keys) and returns a key."""
+        if db:
+            values.append(db)
         return 'jc_multi_%s' % self.gen_key(*values)
 
     def gen_key(self, *values):
@@ -63,39 +69,40 @@ class KeyHandler(object):
         self.keygen = keygen()
         self.cache_backend = cache_backend
 
-    def get_generation(self, *tables):
+    def get_generation(self, *tables, **kwargs):
         """Get the generation key for any number of tables."""
+        db = kwargs.get('db', 'default')
         if len(tables) > 1:
-            return self.get_multi_generation(tables)
-        return self.get_single_generation(tables[0])
+            return self.get_multi_generation(tables, db)
+        return self.get_single_generation(tables[0], db)
 
-    def get_single_generation(self, table):
+    def get_single_generation(self, table, db='default'):
         """Creates a random generation value for a single table name"""
-        key = self.keygen.gen_table_key(table)
+        key = self.keygen.gen_table_key(table, db)
         val = self.cache_backend.get(key, None)
         if val == None:
             val = self.keygen.random_generator()
             self.cache_backend.set(key, val)
         return val
 
-    def get_multi_generation(self, tables):
+    def get_multi_generation(self, tables, db='default'):
         """Takes a list of table names and returns an aggregate
         value for the generation"""
         generations = []
         for table in tables:
-            generations += self.get_single_generation(table)
-        key = self.keygen.gen_multi_key(generations)
+            generations += self.get_single_generation(table, db)
+        key = self.keygen.gen_multi_key(generations, db)
         val = self.cache_backend.get(key, None)
         if val == None:
             val = self.keygen.random_generator()
             self.cache_backend.set(key, val)
         return val
 
-    def invalidate_table(self, table):
+    def invalidate_table(self, table, db='default'):
         """Invalidates a table's generation and returns a new one
         (Note that this also invalidates all multi generations
         containing the table)"""
-        key = self.keygen.gen_table_key(table)
+        key = self.keygen.gen_table_key(table, db)
         val = self.keygen.random_generator()
         self.cache_backend.set(key, val)
         return val
@@ -154,7 +161,8 @@ class QueryCacheBackend(object):
                 if result_type == MULTI:
                     return query.empty_iter()
 
-            gen_key = self.keyhandler.get_generation(*cls.query.tables)
+            db = getattr(cls, 'using', 'default')
+            gen_key = self.keyhandler.get_generation(*cls.query.tables, db=db)
             key = self.keyhandler.sql_key(gen_key, sql, params, cls.get_ordering(), result_type)
             val = self.cache_backend.get(key, None)
             if val != None:
@@ -174,13 +182,16 @@ class QueryCacheBackend(object):
     def _monkey_write(self, original):
         @wraps(original)
         def newfun(cls, *args, **kwargs):
+            db = getattr(cls, 'using', 'default')
             from django.db.models.sql import compiler
             if type(cls) == compiler.SQLInsertCompiler:
+                #Inserts are a special case where cls.tables
+                #are not populated.
                 tables = [cls.query.model._meta.db_table]
             else:
                 tables = cls.query.tables
             for table in tables:
-                self.keyhandler.invalidate_table(table)
+                self.keyhandler.invalidate_table(table, db)
             # XXX: the point of this..?
             try:
                 return original(cls, *args, **kwargs)
@@ -201,6 +212,7 @@ class QueryCacheBackend(object):
                 self._original[updater] = updater.execute_sql
                 updater.execute_sql = self._monkey_write(updater.execute_sql)
             self._patched = True
+            self._handle_signals()
 
     def unpatch(self):
         """un-applies this patch."""
