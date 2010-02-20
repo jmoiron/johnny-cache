@@ -11,7 +11,7 @@ try:
 except ImportError:
     from md5 import md5
 
-from django.dispatch import Signal
+import signals
 
 # The KeyGen is used only to generate keys.  Some of these keys will be used
 # directly in the cache, while others are only general purpose functions to
@@ -120,6 +120,7 @@ class QueryCacheBackend(object):
         from django.db.models.sql.constants import MULTI, SINGLE
         from django.db.models.sql.datastructures import EmptyResultSet
 
+        # TODO: i think this parameter list might be a no-no in 2.5
         @wraps(original)
         def newfun(cls, result_type=MULTI, *args, **kwargs):
             from django.db.models.sql import compiler
@@ -160,11 +161,10 @@ class QueryCacheBackend(object):
                 tables = cls.query.tables
             for table in tables:
                 self.keyhandler.invalidate_table(table)
+            # XXX: the point of this..?
             try:
                 return original(cls, *args, **kwargs)
             except:
-                import pdb
-                pdb.set_trace()
                 return original(cls, *args, **kwargs)
         return newfun
 
@@ -236,41 +236,10 @@ class QueryCacheBackend11(QueryCacheBackend):
                 val = self.cache_backend.get(key, None)
 
                 if val is not None:
-                    # the ordering_aliases is a special path in the original code,
-                    # but we're including it in our key above.. is that enough?
                     return val
-                    #if not (cls.ordering_aliases and result_type == SINGLE):
-                    #    return val
 
-                # we didn't find the value in the cache, so execute the query
-            # uncomment below to make sure that only INSERTs are bypassing cache
-            elif sql.startswith('INSERT') and 'django_content_type' in sql:
-                pass #from ipdb import set_trace; set_trace()
-
-            cursor = cls.connection.cursor()
-            cursor.execute(sql, params)
-
-            if not result_type:
-                return cursor
-            if result_type == SINGLE:
-                if cls.ordering_aliases:
-                    return cursor.fetchone()[:-len(cls.ordering_aliases)]
-                # otherwise, cache the value and return
-                result = cursor.fetchone()
-                self.cache_backend.set(key, result)
-                return result
-            #from ipdb import set_trace; set_trace()
-
-            if cls.ordering_aliases:
-                result = query.order_modified_iter(cursor, len(cls.ordering_aliases),
-                        cls.connection.features.empty_fetchmany_value)
-            else:
-                result = iter((lambda: cursor.fetchmany(query.GET_ITERATOR_CHUNK_SIZE)),
-                        cls.connection.features.empty_fetchmany_value)
-            # XXX: We skip the chunked reads issue here because we want to put
-            # the query result into the cache;  however, is there a way we could
-            # provide an iter that would cache automatically upon read?  Would
-            # this less-greedy caching strategy actually be worse in the common case?
+            # we didn't find the value in the cache, so execute the query
+            result = original(cls, result_type)
             if cls.tables:
                 result = list(result)
                 self.cache_backend.set(key, result)
@@ -281,7 +250,6 @@ class QueryCacheBackend11(QueryCacheBackend):
         from django.db.models import sql
         if self._patched:
             return
-        #print "Patching execute_sql (1.1)"
         self._original = sql.Query.execute_sql
         sql.Query.execute_sql = self._monkey_execute_sql(sql.Query.execute_sql)
         self._handle_signals()
@@ -295,6 +263,3 @@ class QueryCacheBackend11(QueryCacheBackend):
         sql.Query.execute_sql = self._original
         self._patched = False
 
-class signals(object):
-    qc_hit = Signal(providing_args=[])
-    qc_miss = Signal(providing_args=[])
