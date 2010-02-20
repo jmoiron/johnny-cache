@@ -13,6 +13,18 @@ except ImportError:
 
 import signals
 
+def get_backend(cache_backend=None):
+    """Get's a QueryCacheBackend for the current version of django using the
+    'real' cache backend provided, or django.core.cache.cache by default."""
+    import django
+    if cache_backend is None:
+        from django.core.cache import cache as cache_backend
+    if django.VERSION[:2] == (1, 1):
+        return QueryCacheBackend11(cache_backend)
+    if django.VERSION[:2] == (1, 2):
+        return QueryCacheBackend(cache_backend)
+    raise ImproperlyConfigured("QueryCacheMiddleware cannot patch your version of django.")
+
 # The KeyGen is used only to generate keys.  Some of these keys will be used
 # directly in the cache, while others are only general purpose functions to
 # generate hashes off of one or more values.

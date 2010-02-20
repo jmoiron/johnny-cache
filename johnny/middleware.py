@@ -20,7 +20,7 @@ class QueryCacheMiddleware(object):
         self.disabled = getattr(settings, 'DISABLE_QUERYSET_CACHE', False)
         self.installed = getattr(self, 'installed', False)
         if not self.installed and not self.disabled:
-            self.query_cache_backend = self._get_backend()
+            self.query_cache_backend = cache.get_backend()
             self.query_cache_backend.patch()
             self.installed = True
 
@@ -28,11 +28,4 @@ class QueryCacheMiddleware(object):
         self.query_cache_backend.unpatch()
         self.query_cache_backend.flush_query_cache()
         self.installed = False
-
-    def _get_backend(self):
-        if django.VERSION[:2] == (1, 1):
-            return cache.QueryCacheBackend11(dcache)
-        if django.VERSION[:2] == (1, 2):
-            return cache.QueryCacheBackend(dcache)
-        raise ImproperlyConfigured("QueryCacheMiddleware cannot patch your version of django.")
 
