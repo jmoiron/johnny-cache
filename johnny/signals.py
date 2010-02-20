@@ -5,5 +5,5 @@
 
 from django.dispatch import Signal
 
-qc_hit = Signal(providing_args=['tables', 'query', 'size'])
-qc_miss = Signal(providing_args=['tables', 'query'])
+qc_hit = Signal(providing_args=['key', 'tables', 'query', 'size'])
+qc_miss = Signal(providing_args=['key', 'tables', 'query'])

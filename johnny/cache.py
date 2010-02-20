@@ -274,7 +274,13 @@ class QueryCacheBackend11(QueryCacheBackend):
                 val = self.cache_backend.get(key, None)
 
                 if val is not None:
+                    signals.qc_hit.send(sender=cls, tables=cls.tables,
+                            query=(sql, params, cls.ordering_aliases),
+                            size=len(val), key=key)
                     return val
+                signals.qc_miss.send(sender=cls, tables=cls.tables,
+                        query=(sql, params, cls.ordering_aliases),
+                        key=key)
 
             # we didn't find the value in the cache, so execute the query
             result = original(cls, result_type)

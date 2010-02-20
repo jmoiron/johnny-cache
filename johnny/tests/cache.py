@@ -82,6 +82,24 @@ class SingleModelTest(QueryCacheBase):
         self.failUnless((first[0], first[1] == second[1], second[0]))
         self.failUnless(len(connection.queries) == 2)
 
+    def test_signals(self):
+        """Test that the signals we say we're sending are being sent."""
+        from testapp.models import Genre
+        from johnny.signals import qc_hit, qc_miss
+        connection.queries = []
+        misses = []
+        hits = []
+        def qc_hit_listener(sender, **kwargs):
+            hits.append(kwargs['key'])
+        def qc_miss_listener(*args, **kwargs):
+            misses.append(kwargs['key'])
+        qc_hit.connect(qc_hit_listener)
+        qc_miss.connect(qc_miss_listener)
+        first = list(Genre.objects.filter(title__startswith='A').order_by('slug'))
+        second = list(Genre.objects.filter(title__startswith='A').order_by('slug'))
+        self.failUnless(len(misses) == len(hits) == 1)
+
+
 class MultiModelTest(QueryCacheBase):
     fixtures = base.johnny_fixtures
 
