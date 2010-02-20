@@ -44,6 +44,20 @@ class SingleModelTest(QueryCacheBase):
         self.failUnless(len(connection.queries) == 1)
         self.failUnless(new_count == 2)
 
+    def test_querycache_return_results(self):
+        """Test that the return results from the query cache are what we
+        expect;  single items are single items, etc."""
+        from testapp.models import Publisher
+        connection.queries = []
+        pub = Publisher.objects.get(id=1)
+        pub2 = Publisher.objects.get(id=1)
+        self.failUnless(pub == pub2)
+        self.failUnless(len(connection.queries) == 1)
+        pubs = list(Publisher.objects.all())
+        pubs2 = list(Publisher.objects.all())
+        self.failUnless(pubs == pubs2)
+        self.failUnless(len(connection.queries) == 2)
+
     def test_queryset_laziness(self):
         """This test exists to model the laziness of our queries;  the
         QuerySet cache should not alter the laziness of QuerySets."""
