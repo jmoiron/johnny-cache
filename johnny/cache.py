@@ -26,6 +26,11 @@ def get_backend():
         return QueryCacheBackend()
     raise ImproperlyConfigured("QueryCacheMiddleware cannot patch your version of django.")
 
+def invalidate(*tables):
+    """Invalidate the current generation for one or more tables.  The arguments
+    can be either strings representing database table names or models."""
+    pass
+
 # The KeyGen is used only to generate keys.  Some of these keys will be used
 # directly in the cache, while others are only general purpose functions to
 # generate hashes off of one or more values.
