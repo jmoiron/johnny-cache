@@ -57,4 +57,12 @@ class LocalStoreTest(TestCase):
             self.assertNotEquals(d['name'], 'Hi')
             self.assertEquals(d[d['name']], 1)
 
+    def test_localstore_clear_middleware(self):
+        from johnny import cache, middleware
+        cache.local.clear()
+        cache.local['eggs'] = 'spam'
+        cache.local['charlie'] = 'chaplin'
+        self.failUnless(len(cache.local) == 2)
+        middleware.LocalStoreClearMiddleware().process_response(None, None)
+        self.failUnless(len(cache.local) == 0)
 

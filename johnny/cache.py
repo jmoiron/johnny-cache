@@ -303,7 +303,6 @@ class QueryCacheBackend11(QueryCacheBackend):
         from django.db.models import sql
         if not self._patched:
             return
-        #print "Unpatching execute_sql (1.1)"
         sql.Query.execute_sql = self._original
         self._patched = False
 

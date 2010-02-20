@@ -36,7 +36,7 @@ class LocalStoreClearMiddleware(object):
         cache.local.clear()
         raise
 
-    def process_response(req, resp):
+    def process_response(self, req, resp):
         cache.local.clear()
         return resp
 
