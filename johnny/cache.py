@@ -130,9 +130,10 @@ class QueryCacheBackend(object):
             keygen = KeyGen
         if keyhandler is None and not hasattr(self, 'keyhandler'):
             keyhandler = KeyHandler
-        if keyhandler: assert(keygen)
-        self.cache_backend = cache_backend if cache_backend else self.cache_backend
-        self.keyhandler = keyhandler(cache_backend, keygen) if keygen and keyhandler else self.keyhandler
+        if cache_backend: self.cache_backend = cache_backend
+        if keyhandler:
+            assert(keygen)
+            self.keyhandler = keyhandler(self.cache_backend, keygen)
         self._patched = getattr(self, '_patched', False)
 
     def _monkey_select(self, original):
