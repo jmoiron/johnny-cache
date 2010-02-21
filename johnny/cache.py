@@ -13,6 +13,7 @@ except ImportError:
 
 import localstore
 import signals
+from transaction import TransactionManager
 
 local = localstore.LocalStore()
 
@@ -142,7 +143,7 @@ class QueryCacheBackend(object):
             keygen = KeyGen
         if keyhandler is None and not hasattr(self, 'keyhandler'):
             keyhandler = KeyHandler
-        if cache_backend: self.cache_backend = cache_backend
+        if cache_backend: self.cache_backend = TransactionManager(cache_backend)
         if keyhandler:
             assert(keygen)
             self.keyhandler = keyhandler(self.cache_backend, keygen)
@@ -150,7 +151,7 @@ class QueryCacheBackend(object):
 
     def _monkey_select(self, original):
         from django.db.models.sql import query
-        from django.db.models.sql.constants import MULTI, SINGLE
+        from django.db.models.sql.constants import MULTI
         from django.db.models.sql.datastructures import EmptyResultSet
 
         # TODO: i think this parameter list might be a no-no in 2.5
@@ -170,18 +171,26 @@ class QueryCacheBackend(object):
             db = getattr(cls, 'using', 'default')
             gen_key = self.keyhandler.get_generation(*cls.query.tables, db=db)
             key = self.keyhandler.sql_key(gen_key, sql, params, cls.get_ordering(), result_type)
+
             val = self.cache_backend.get(key, None)
-            if val != None:
+            if val is not None:
+                signals.qc_hit.send(sender=cls, tables=cls.query.tables,
+                        query=(sql, params, cls.query.ordering_aliases),
+                        size=len(val), key=key)
                 return val
-            else:
-                val = original(cls, result_type, *args, **kwargs)
-                if hasattr(val, '__iter__'):
-                    #Can't permanently cache lazy iterables without creating
-                    #a cacheable data structure. Note that this makes them
-                    #no longer lazy...
-                    #todo - create a smart iterable wrapper
-                    val = list(val)
-                self.cache_backend.set(key, val)
+
+            signals.qc_miss.send(sender=cls, tables=cls.query.tables,
+                    query=(sql, params, cls.query.ordering_aliases),
+                    key=key)
+
+            val = original(cls, result_type, *args, **kwargs)
+            if hasattr(val, '__iter__'):
+                #Can't permanently cache lazy iterables without creating
+                #a cacheable data structure. Note that this makes them
+                #no longer lazy...
+                #todo - create a smart iterable wrapper
+                val = list(val)
+            self.cache_backend.set(key, val)
             return val
         return newfun
 
@@ -198,11 +207,7 @@ class QueryCacheBackend(object):
                 tables = cls.query.tables
             for table in tables:
                 self.keyhandler.invalidate_table(table, db)
-            # XXX: the point of this..?
-            try:
-                return original(cls, *args, **kwargs)
-            except:
-                return original(cls, *args, **kwargs)
+            return original(cls, *args, **kwargs)
         return newfun
 
 
@@ -227,7 +232,7 @@ class QueryCacheBackend(object):
         from django.db.models.sql import compiler
         for func in (compiler.SQLCompiler, compiler.SQLAggregateCompiler, compiler.SQLDateCompiler,
                 compiler.SQLInsertCompiler, compiler.SQLDeleteCompiler, compiler.SQLUpdateCompiler):
-            func.execute_compiler = self._original[func]
+            func.execute_sql = self._original[func]
         self._patched = False
 
     def invalidate(self, instance, **kwargs):
