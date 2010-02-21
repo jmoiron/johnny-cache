@@ -150,10 +150,55 @@ class TransactionSupportTest(TransactionQueryCacheBase):
     fixtures = base.johnny_fixtures
 
     def test_local_transaction_hiding(self):
+        """Test transaction support in Johnny."""
+        from Queue import Queue as queue
+        from threading import Thread
+
         from django.db import transaction
+        from testapp.models import Genre, Publisher
         from johnny import cache
         self.failUnless(transaction.is_managed() == False)
         self.failUnless(transaction.is_dirty() == False)
+        connection.queries = []
         cache.local.clear()
+        q = queue()
+        def other(query):
+            """Executes an orm query as a string syncronously in another thread
+            and puts the result on the q."""
+            def _inner(que):
+                from testapp.models import Genre, Publisher
+                q.put(eval(que))
+            t = Thread(target=_inner, args=(query,))
+            t.start()
+            t.join()
 
+        # load some data
+        start = Genre.objects.get(id=1)
+        other('Genre.objects.get(id=1)')
+        ostart = q.get()
+        # so far so good, these should be the same and should have hit cache
+        self.failUnless(len(connection.queries) == 1)
+        self.failUnless(ostart == start)
+        # enter manual transaction management
+        transaction.enter_transaction_management()
+        transaction.managed()
 
+        start.name = 'Jackie Chan Novels'
+        # local invalidation, this key should hit the localstore!
+        nowlen = len(cache.local)
+        start.save()
+        self.failUnless(nowlen != len(cache.local))
+        # perform a read OUTSIDE this transaction... it should still see the
+        # old gen key, and should still find the right 
+        other('Genre.objects.get(id=1)')
+        ostart = q.get()
+        self.failUnless(ostart.name != start.name)
+        self.failUnless(len(connection.queries) == 2)
+        transaction.commit()
+        # now that we commit, we push the localstore keys out;  this should be
+        # a cache miss, because we never read it inside the previous transaction
+        other('Genre.objects.get(id=1)')
+        ostart = q.get()
+        self.failUnless(ostart.name == start.name)
+        self.failUnless(len(connection.queries) == 3)
+        transaction.leave_transaction_management()
