@@ -11,17 +11,32 @@ import base
 # put tests in here to be included in the testing suite
 __all__ = ['SingleModelTest', 'MultiModelTest', 'TransactionSupportTest']
 
+def _pre_setup(self):
+    self.saved_DISABLE_SETTING = getattr(settings, 'DISABLE_QUERYSET_CACHE', False)
+    settings.DISABLE_QUERYSET_CACHE = False
+    self.middleware = middleware.QueryCacheMiddleware()
+
+def _post_teardown(self):
+    self.middleware.unpatch()
+    settings.DISABLE_QUERYSET_CACHE = self.saved_DISABLE_SETTING
+
 class QueryCacheBase(base.JohnnyTestCase):
     def _pre_setup(self):
-        self.saved_DISABLE_SETTING = getattr(settings, 'DISABLE_QUERYSET_CACHE', False)
-        settings.DISABLE_QUERYSET_CACHE = False
-        self.middleware = middleware.QueryCacheMiddleware()
+        _pre_setup(self)
         super(QueryCacheBase, self)._pre_setup()
 
     def _post_teardown(self):
-        self.middleware.unpatch()
-        settings.DISABLE_QUERYSET_CACHE = self.saved_DISABLE_SETTING
+        _post_teardown(self)
         super(QueryCacheBase, self)._post_teardown()
+
+class TransactionQueryCacheBase(base.TransactionJohnnyTestCase):
+    def _pre_setup(self):
+        _pre_setup(self)
+        super(TransactionQueryCacheBase, self)._pre_setup()
+
+    def _post_teardown(self):
+        _post_teardown(self)
+        super(TransactionQueryCacheBase, self)._post_teardown()
 
 
 class SingleModelTest(QueryCacheBase):
@@ -131,10 +146,14 @@ class MultiModelTest(QueryCacheBase):
         books = list(Book.objects.select_related('publisher'))
         self.failUnless(len(connection.queries) == 6)
 
-class TransactionSupportTest(QueryCacheBase):
+class TransactionSupportTest(TransactionQueryCacheBase):
     fixtures = base.johnny_fixtures
 
     def test_local_transaction_hiding(self):
-        from ipdb import set_trace; set_trace()
-        pass
+        from django.db import transaction
+        from johnny import cache
+        self.failUnless(transaction.is_managed() == False)
+        self.failUnless(transaction.is_dirty() == False)
+        cache.local.clear()
+
 
