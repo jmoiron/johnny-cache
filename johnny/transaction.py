@@ -62,24 +62,20 @@ class TransactionManager(object):
                 self.cache_backend[key] = value
         self._clear()
 
-    def _get_using(*args, **kwargs):
-        if 'using' in kwargs:
-            return kwargs['using']
-        if args:
-            return args[-1]
-        return None
-
     def _patched(self, original, commit=True):
         @wraps(original)
-        def newfun(*args, **kwargs):
-            #parsing using here since change 1.1 does not use it
-            using = self._get_using(*args, **kwargs)
-            if using:
-                original(using=using)
-            else:
-                original()
+        def newfun(using=None):
+            #1.2 version
+            original(using=using)
             self._flush(commit=commit)
-        return newfun
+
+        @wraps(original)
+        def newfun11():
+            #1.1 version
+            original()
+            self._flush(commit=commit)
+        if django.VERSION[:2] == (1,1): return newfun11
+        if django.VERSION[:2] == (1,2): return newfun
     
     def patch(self):
         """
