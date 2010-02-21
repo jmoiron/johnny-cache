@@ -18,7 +18,7 @@ class TransactionManager(object):
     On rollback, it will flush all local caches
     On commit, it will push them up to the cache backend
     """
-    _patched = False
+    _patched_var = False
     def __init__(self, cache_backend):
         self.cache_backend = cache_backend
 
@@ -56,7 +56,6 @@ class TransactionManager(object):
         """
         Flushes the internal cache, either to the memcache or rolls back
         """
-        print "Flushing"
         if commit:
             for key, value in self.local_cache.iteritems():
                 self.cache_backend[key] = value
@@ -87,8 +86,8 @@ class TransactionManager(object):
         writes to the cache should not happen until commit (unless our state isn't managed).
         It does not yet support savepoints.
         """
-        if not self._patched:
-            django_transaction.rollback = self.patched(django_transaction.rollback, False)
-            django_transaction.commit = self.patched(django_transaction.rollback, True)
-            self._patched = True
+        if not self._patched_var:
+            django_transaction.rollback = self._patched(django_transaction.rollback, False)
+            django_transaction.commit = self._patched(django_transaction.rollback, True)
+            self._patched_var = True
 
