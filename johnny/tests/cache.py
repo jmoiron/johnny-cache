@@ -134,5 +134,5 @@ class MultiModelTest(QueryCacheBase):
 class TransactionSupportTest(QueryCacheBase):
     fixtures = base.johnny_fixtures
 
-    def test_managed_transactions(self):
+    def test_local_transaction_hiding(self):
         pass

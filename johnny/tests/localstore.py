@@ -24,6 +24,18 @@ class LocalStoreTest(TestCase):
         store.clear()
         self.assertEquals(len(store), 0)
 
+    def test_custom_clear(self):
+        """Test that clear(glob) works as expected."""
+        store = localstore.LocalStore()
+        for x in (1,2,3,4,5):
+            store['key_%s' % x] = 'value_%s' % x
+            store['ex_%s' % x] = 'ecks_%s' % x
+        self.assertEquals(len(store), 10)
+        store.clear('*4')
+        self.assertEquals(len(store), 8)
+        store.clear('ex_*')
+        self.assertEquals(len(store), 4)
+
     def test_thread_locality(self):
         from Queue import Queue
         from threading import Thread, current_thread

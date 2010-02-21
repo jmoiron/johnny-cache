@@ -3,6 +3,8 @@
 
 """Threadlocal OpenStruct-like cache."""
 
+import re
+import fnmatch
 import threading
 
 class LocalStore(threading.local):
@@ -33,7 +35,16 @@ class LocalStore(threading.local):
     def iteritems(self): return self.__dict__.iteritems()
     def get(self, *args): return self.__dict__.get(*args)
     def update(self, d): self.__dict__.update(d)
-    def clear(self): self.__dict__.clear()
+    def clear(self, pat=None):
+        """Minor diversion with built-in dict here;  clear can take a glob
+        style expression and remove keys based on that expression."""
+        if pat is None:
+            return self.__dict__.clear()
+        expr = re.compile(fnmatch.translate(pat))
+        for key in self.keys():
+            if expr.match(key):
+                del self.__dict__[key]
+
     def __repr__(self): return repr(self.__dict__)
     def __str__(self): return str(self.__dict__)
 
