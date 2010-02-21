@@ -9,7 +9,7 @@ from johnny import middleware
 import base
 
 # put tests in here to be included in the testing suite
-__all__ = ['SingleModelTest', 'MultiModelTest']
+__all__ = ['SingleModelTest', 'MultiModelTest', 'TransactionSupportTest']
 
 class QueryCacheBase(base.JohnnyTestCase):
     def _pre_setup(self):
@@ -135,4 +135,6 @@ class TransactionSupportTest(QueryCacheBase):
     fixtures = base.johnny_fixtures
 
     def test_local_transaction_hiding(self):
+        from ipdb import set_trace; set_trace()
         pass
+
