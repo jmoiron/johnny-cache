@@ -131,3 +131,8 @@ class MultiModelTest(QueryCacheBase):
         books = list(Book.objects.select_related('publisher'))
         self.failUnless(len(connection.queries) == 6)
 
+class TransactionSupportTest(QueryCacheBase):
+    fixtures = base.johnny_fixtures
+
+    def test_managed_transactions(self):
+        pass
