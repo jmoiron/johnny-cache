@@ -1,12 +1,13 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 from django.db import transaction as django_transaction
-try:
-    import thread
-except ImportError:
-    import dummy_thread as thread
+
 try:
     from functools import wraps
 except ImportError:
     from django.utils.functional import wraps  # Python 2.3, 2.4 fallback.
+
 import localstore
 
 import django
