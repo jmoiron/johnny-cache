@@ -18,6 +18,7 @@ class TransactionManager(object):
     On rollback, it will flush all local caches
     On commit, it will push them up to the cache backend
     """
+    _patched = False
     def __init__(self, cache_backend):
         self.cache_backend = cache_backend
 
@@ -82,10 +83,8 @@ class TransactionManager(object):
     
     def patch(self):
         """
-        This function monkey patches enter_transaction_management,
-        leave_transaction_management,  set_clean, and set_dirty
-        to track the entering and leaving of transactions. If we're in transactions, 
-        writes to the cache should not happen until commit.
+        This function monkey patches commit and rollback
+        writes to the cache should not happen until commit (unless our state isn't managed).
         It does not yet support savepoints.
         """
         if not self._patched:
