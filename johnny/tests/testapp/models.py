@@ -14,7 +14,6 @@ class PersonType(models.Model):
     class Meta:
         verbose_name = _('person type')
         verbose_name_plural = _('person types')
-        db_table = 'people_types'
         ordering = ('title',)
 
     def __unicode__(self):
@@ -48,7 +47,6 @@ class Person(models.Model):
     class Meta:
         verbose_name = _('person')
         verbose_name_plural = _('people')
-        db_table = 'people'
         ordering = ('last_name', 'first_name',)
 
     def __unicode__(self):
@@ -69,7 +67,6 @@ class Genre(models.Model):
     slug = models.SlugField(unique=True)
 
     class Meta:
-        db_table = 'book_genres'
         ordering = ('title',)
 
     def __unicode__(self):
@@ -88,7 +85,6 @@ class Publisher(models.Model):
     website = models.URLField(blank=True, verify_exists=False)
 
     class Meta:
-        db_table = 'book_publishers'
         ordering = ('title',)
 
     def __unicode__(self):
@@ -121,7 +117,6 @@ class Book(models.Model):
     modified = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'books'
         ordering = ('title',)
 
     def __unicode__(self):
@@ -157,9 +152,6 @@ class Highlight(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
 
-    class Meta:
-        db_table = 'book_highlights'
-
     def __unicode__(self):
         return '%s' % self.highlight
 
@@ -176,7 +168,6 @@ class Page(models.Model):
     created = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'book_read_pages'
         ordering = ('-created',)
 
     def __unicode__(self):

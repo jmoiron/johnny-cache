@@ -84,7 +84,7 @@ class TransactionManager(object):
             self._originals['rollback'] = django_transaction.rollback
             self._originals['commit'] = django_transaction.commit
             django_transaction.rollback = self._patched(django_transaction.rollback, False)
-            django_transaction.commit = self._patched(django_transaction.rollback, True)
+            django_transaction.commit = self._patched(django_transaction.commit, True)
             self._patched_var = True
 
     def unpatch(self):
