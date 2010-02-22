@@ -35,6 +35,8 @@ class LocalStoreTest(TestCase):
         self.assertEquals(len(store), 8)
         store.clear('ex_*')
         self.assertEquals(len(store), 4)
+        self.assertEquals(len(store.mget('key*')), 4)
+        self.assertEquals(len(store.mget('*_2')), 1)
 
     def test_thread_locality(self):
         from Queue import Queue
@@ -77,4 +79,5 @@ class LocalStoreTest(TestCase):
         self.failUnless(len(cache.local) == 2)
         middleware.LocalStoreClearMiddleware().process_response(None, None)
         self.failUnless(len(cache.local) == 0)
+
 
