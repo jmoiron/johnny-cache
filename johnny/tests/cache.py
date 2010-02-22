@@ -152,46 +152,46 @@ class MultiModelTest(QueryCacheBase):
 class TransactionSupportTest(TransactionQueryCacheBase):
     fixtures = base.johnny_fixtures
 
-    def test_local_transaction_hiding(self):
+    def _run_threaded(self, query, queue):
+        """Runs a query (as a string) from testapp in another thread and
+        puts (hit?, result) on the provided queue."""
+        from threading import Thread
+        def _inner(_query):
+            from testapp.models import Genre, Book, Publisher, Person
+            from johnny.signals import qc_hit, qc_miss
+            msg = []
+            def hit(*args, **kwargs):
+                msg.append(True)
+            def miss(*args, **kwargs):
+                msg.append(False)
+            qc_hit.connect(hit)
+            qc_miss.connect(miss)
+            obj = eval(_query)
+            msg.append(obj)
+            queue.put(msg)
+        t = Thread(target=_inner, args=(query,))
+        t.start()
+        t.join()
+
+    def test_transaction_commit(self):
         """Test transaction support in Johnny."""
         from Queue import Queue as queue
-        from threading import Thread
-
         from django.db import transaction
         from testapp.models import Genre, Publisher
         from johnny import cache
-        from django.db.models import signals
 
         self.failUnless(transaction.is_managed() == False)
         self.failUnless(transaction.is_dirty() == False)
         connection.queries = []
         cache.local.clear()
         q = queue()
-        def other(query):
-            """Executes an orm query as a string syncronously in another thread
-            and puts the result on the q."""
-            def _inner(que):
-                from testapp.models import Genre, Publisher
-                from johnny.signals import qc_hit, qc_miss
-                msg = []
-                def hit(*args, **kwargs):
-                    msg.append(True)
-                def miss(*args, **kwargs):
-                    msg.append(False)
-                qc_hit.connect(hit)
-                qc_miss.connect(miss)
-                obj = eval(que)
-                msg.append(obj)
-                q.put(msg)
-            t = Thread(target=_inner, args=(query,))
-            t.start()
-            t.join()
+        other = lambda x: self._run_threaded(x, q)
 
         # load some data
         start = Genre.objects.get(id=1)
         other('Genre.objects.get(id=1)')
         hit, ostart = q.get()
-        # so far so good, these should be the same and should have hit cache
+        # these should be the same and should have hit cache
         self.failUnless(hit)
         self.failUnless(ostart == start)
         # enter manual transaction management
@@ -216,3 +216,61 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         self.failUnless(not hit)
         self.failUnless(ostart.title == start.title)
         transaction.leave_transaction_management()
+
+    def test_transaction_rollback(self):
+        """Tests johnny's handling of transaction rollbacks.
+
+        Similar to the commit, this sets up a write to a db in a transaction,
+        reads from it (to force a cache write of sometime), then rolls back."""
+        from Queue import Queue as queue
+        from django.db import transaction
+        from testapp.models import Genre, Publisher
+        from johnny import cache
+
+        self.failUnless(transaction.is_managed() == False)
+        self.failUnless(transaction.is_dirty() == False)
+        connection.queries = []
+        cache.local.clear()
+        q = queue()
+        other = lambda x: self._run_threaded(x, q)
+
+        # load some data
+        start = Genre.objects.get(id=1)
+        other('Genre.objects.get(id=1)')
+        hit, ostart = q.get()
+        # these should be the same and should have hit cache
+        self.failUnless(hit)
+        self.failUnless(ostart == start)
+        # enter manual transaction management
+        transaction.enter_transaction_management()
+        transaction.managed()
+        start.title = 'Jackie Chan Novels'
+        # local invalidation, this key should hit the localstore!
+        nowlen = len(cache.local)
+        start.save()
+        self.failUnless(nowlen != len(cache.local))
+        # perform a read OUTSIDE this transaction... it should still see the
+        # old gen key, and should still find the "old" data
+        other('Genre.objects.get(id=1)')
+        hit, ostart = q.get()
+        self.failUnless(hit)
+        self.failUnless(ostart.title != start.title)
+        # perform a READ inside the transaction;  this should hit the localstore
+        # but not the outside!
+        nowlen = len(cache.local)
+        start2 = Genre.objects.get(id=1)
+        self.failUnless(start2.title == start.title)
+        self.failUnless(len(cache.local) > nowlen)
+        transaction.rollback()
+        # we rollback, and flush all johnny keys related to this transaction
+        # subsequent gets should STILL hit the cache in the other thread
+        # and indeed, in this thread.
+
+        self.failUnless(transaction.is_dirty() == False)
+        other('Genre.objects.get(id=1)')
+        hit, ostart = q.get()
+        self.failUnless(hit)
+        start = Genre.objects.get(id=1)
+        self.failUnless(ostart.title == start.title)
+        transaction.leave_transaction_management()
+
