@@ -169,7 +169,17 @@ class TransactionSupportTest(TransactionQueryCacheBase):
             and puts the result on the q."""
             def _inner(que):
                 from testapp.models import Genre, Publisher
-                q.put(eval(que))
+                from johnny.signals import qc_hit, qc_miss
+                msg = []
+                def hit(*args, **kwargs):
+                    msg.append(True)
+                def miss(*args, **kwargs):
+                    msg.append(False)
+                qc_hit.connect(hit)
+                qc_miss.connect(miss)
+                obj = eval(que)
+                msg.append(obj)
+                q.put(msg)
             t = Thread(target=_inner, args=(query,))
             t.start()
             t.join()
@@ -177,9 +187,9 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         # load some data
         start = Genre.objects.get(id=1)
         other('Genre.objects.get(id=1)')
-        ostart = q.get()
+        hit, ostart = q.get()
         # so far so good, these should be the same and should have hit cache
-        self.failUnless(len(connection.queries) == 1)
+        self.failUnless(hit)
         self.failUnless(ostart == start)
         # enter manual transaction management
         transaction.enter_transaction_management()
@@ -190,16 +200,16 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         start.save()
         self.failUnless(nowlen != len(cache.local))
         # perform a read OUTSIDE this transaction... it should still see the
-        # old gen key, and should still find the right 
+        # old gen key, and should still find the "old" data
         other('Genre.objects.get(id=1)')
-        ostart = q.get()
+        hit, ostart = q.get()
+        self.failUnless(hit)
         self.failUnless(ostart.title != start.title)
-        self.failUnless(len(connection.queries) == 3)
         transaction.commit()
         # now that we commit, we push the localstore keys out;  this should be
         # a cache miss, because we never read it inside the previous transaction
         other('Genre.objects.get(id=1)')
-        ostart = q.get()
+        hit, ostart = q.get()
+        self.failUnless(not hit)
         self.failUnless(ostart.title == start.title)
-        self.failUnless(len(connection.queries) == 4)
         transaction.leave_transaction_management()
