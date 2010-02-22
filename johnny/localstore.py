@@ -35,6 +35,17 @@ class LocalStore(threading.local):
     def iteritems(self): return self.__dict__.iteritems()
     def get(self, *args): return self.__dict__.get(*args)
     def update(self, d): self.__dict__.update(d)
+    def mget(self, pat=None):
+        """Get a dictionary mapping of all k:v pairs with key matching
+        glob style expression `pat`."""
+        if pat is None: return {}
+        expr = re.compile(fnmatch.translate(pat))
+        m = {}
+        for key in self.keys():
+            if expr.match(key):
+                m[key] = self[key]
+        return m
+
     def clear(self, pat=None):
         """Minor diversion with built-in dict here;  clear can take a glob
         style expression and remove keys based on that expression."""
@@ -48,5 +59,4 @@ class LocalStore(threading.local):
     def __repr__(self): return repr(self.__dict__)
     def __str__(self): return str(self.__dict__)
 
-Cache = LocalStore()
 

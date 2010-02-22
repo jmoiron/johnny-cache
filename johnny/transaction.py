@@ -8,8 +8,6 @@ try:
 except ImportError:
     from django.utils.functional import wraps  # Python 2.3, 2.4 fallback.
 
-import localstore
-
 import django
 
 class TransactionManager(object):
@@ -21,11 +19,9 @@ class TransactionManager(object):
     """
     _patched_var = False
     def __init__(self, cache_backend):
+        from johnny import cache
         self.cache_backend = cache_backend
-
-        if 'jc_tm_transaction_store' not in localstore.Cache:
-            localstore.Cache['jc_tm_transaction_store'] = {}
-        self.local_cache = localstore.Cache['jc_tm_transaction_store']
+        self.local = cache.local
         self.patch()
 
     def is_dirty(self):
@@ -33,7 +29,7 @@ class TransactionManager(object):
 
     def get(self, key, default=None):
         if self.is_dirty():
-            val = self.local_cache.get(key, None)
+            val = self.local.get(key, None)
             if val: return val
         return self.cache_backend.get(key, default)
 
@@ -45,21 +41,22 @@ class TransactionManager(object):
         to the global cache on commit, so it will still be a bump.
         """
         if self.is_dirty():
-            self.local_cache[key] = val
+            self.local[key] = val
         else:
             self.cache_backend.set(key, val)
 
     def _clear(self):
-        self.local_cache = {}
-        localstore.Cache['jc_tm_transaction_store'] = self.local_cache
+        self.local.clear('jc_*')
 
     def _flush(self, commit=True):
         """
         Flushes the internal cache, either to the memcache or rolls back
         """
         if commit:
-            for key, value in self.local_cache.iteritems():
-                self.cache_backend[key] = value
+            # XXX: multi-set? 
+            c = self.local.mget('jc_*')
+            for key, value in c.iteritems():
+                self.cache_backend.set(key, value)
         self._clear()
 
     def _patched(self, original, commit=True):
@@ -76,7 +73,7 @@ class TransactionManager(object):
             self._flush(commit=commit)
         if django.VERSION[:2] == (1,1): return newfun11
         if django.VERSION[:2] == (1,2): return newfun
-    
+
     def patch(self):
         """
         This function monkey patches commit and rollback

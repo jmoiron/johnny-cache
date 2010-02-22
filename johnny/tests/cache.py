@@ -157,6 +157,8 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         from django.db import transaction
         from testapp.models import Genre, Publisher
         from johnny import cache
+        from django.db.models import signals
+
         self.failUnless(transaction.is_managed() == False)
         self.failUnless(transaction.is_dirty() == False)
         connection.queries = []
@@ -182,7 +184,6 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         # enter manual transaction management
         transaction.enter_transaction_management()
         transaction.managed()
-        import ipdb; ipdb.set_trace();
 
         start.title = 'Jackie Chan Novels'
         # local invalidation, this key should hit the localstore!
@@ -194,12 +195,13 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         other('Genre.objects.get(id=1)')
         ostart = q.get()
         self.failUnless(ostart.title != start.title)
-        self.failUnless(len(connection.queries) == 2)
+        self.failUnless(len(connection.queries) == 3)
+        import ipdb; ipdb.set_trace();
         transaction.commit()
         # now that we commit, we push the localstore keys out;  this should be
         # a cache miss, because we never read it inside the previous transaction
         other('Genre.objects.get(id=1)')
         ostart = q.get()
         self.failUnless(ostart.title == start.title)
-        self.failUnless(len(connection.queries) == 3)
+        self.failUnless(len(connection.queries) == 4)
         transaction.leave_transaction_management()
