@@ -22,13 +22,13 @@ class TransactionManager(object):
         from johnny import cache
         self.cache_backend = cache_backend
         self.local = cache.local
-        self.patch()
+        self._originals = {}
 
     def is_dirty(self):
         return django_transaction.is_dirty()
 
     def get(self, key, default=None):
-        if self.is_dirty():
+        if self.is_dirty() and self._patched_var:
             val = self.local.get(key, None)
             if val: return val
         return self.cache_backend.get(key, default)
@@ -40,7 +40,7 @@ class TransactionManager(object):
         If the key is bumped during a transaction it will be new
         to the global cache on commit, so it will still be a bump.
         """
-        if self.is_dirty():
+        if self.is_dirty() and self._patched_var:
             self.local[key] = val
         else:
             self.cache_backend.set(key, val)
@@ -81,7 +81,15 @@ class TransactionManager(object):
         It does not yet support savepoints.
         """
         if not self._patched_var:
+            self._originals['rollback'] = django_transaction.rollback
+            self._originals['commit'] = django_transaction.commit
             django_transaction.rollback = self._patched(django_transaction.rollback, False)
             django_transaction.commit = self._patched(django_transaction.rollback, True)
             self._patched_var = True
+
+    def unpatch(self):
+        django_transaction.rollback = self._originals['rollback']
+        django_transaction.commit = self._originals['commit']
+        self._patched_var = False
+
 

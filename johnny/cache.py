@@ -226,6 +226,7 @@ class QueryCacheBackend(object):
                 self._original[updater] = updater.execute_sql
                 updater.execute_sql = self._monkey_write(updater.execute_sql)
             self._patched = True
+            self.cache_backend.patch()
             self._handle_signals()
 
     def unpatch(self):
@@ -236,6 +237,7 @@ class QueryCacheBackend(object):
         for func in (compiler.SQLCompiler, compiler.SQLAggregateCompiler, compiler.SQLDateCompiler,
                 compiler.SQLInsertCompiler, compiler.SQLDeleteCompiler, compiler.SQLUpdateCompiler):
             func.execute_sql = self._original[func]
+        self.cache_backend.unpatch()
         self._patched = False
 
     def invalidate(self, instance, **kwargs):
@@ -305,6 +307,7 @@ class QueryCacheBackend11(QueryCacheBackend):
         self._original = sql.Query.execute_sql
         sql.Query.execute_sql = self._monkey_execute_sql(sql.Query.execute_sql)
         self._handle_signals()
+        self.cache_backend.patch()
         self._patched = True
 
     def unpatch(self):
@@ -312,5 +315,6 @@ class QueryCacheBackend11(QueryCacheBackend):
         if not self._patched:
             return
         sql.Query.execute_sql = self._original
+        self.cache_backend.unpatch()
         self._patched = False
 
