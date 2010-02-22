@@ -132,19 +132,22 @@ class MultiModelTest(QueryCacheBase):
         books = list(Book.objects.select_related('publisher'))
         # invalidate the genre key, which shouldn't impact the query
         Genre(title='Science Fiction', slug='scifi').save()
+        after_save = len(connection.queries)
         books = list(Book.objects.select_related('publisher'))
-        self.failUnless(len(connection.queries) == 2)
+        self.failUnless(len(connection.queries) == after_save)
         # now invalidate publisher, which _should_
         p = Publisher(title='McGraw Hill', slug='mcgraw-hill')
         p.save()
+        after_save = len(connection.queries)
         books = list(Book.objects.select_related('publisher'))
-        self.failUnless(len(connection.queries) == 4)
+        self.failUnless(len(connection.queries) == after_save + 1)
         # the query should be cached again... 
         books = list(Book.objects.select_related('publisher'))
         # this time, create a book and the query should again be uncached..
         Book(title='Anna Karenina', slug='anna-karenina', publisher=p).save()
+        after_save = len(connection.queries)
         books = list(Book.objects.select_related('publisher'))
-        self.failUnless(len(connection.queries) == 6)
+        self.failUnless(len(connection.queries) == after_save + 1)
 
 class TransactionSupportTest(TransactionQueryCacheBase):
     fixtures = base.johnny_fixtures

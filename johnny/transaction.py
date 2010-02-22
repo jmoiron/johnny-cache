@@ -24,11 +24,11 @@ class TransactionManager(object):
         self.local = cache.local
         self._originals = {}
 
-    def is_dirty(self):
-        return django_transaction.is_dirty()
+    def is_managed(self):
+        return django_transaction.is_managed()
 
     def get(self, key, default=None):
-        if self.is_dirty() and self._patched_var:
+        if self.is_managed() and self._patched_var:
             val = self.local.get(key, None)
             if val: return val
         return self.cache_backend.get(key, default)
@@ -40,7 +40,7 @@ class TransactionManager(object):
         If the key is bumped during a transaction it will be new
         to the global cache on commit, so it will still be a bump.
         """
-        if self.is_dirty() and self._patched_var:
+        if self.is_managed() and self._patched_var:
             self.local[key] = val
         else:
             self.cache_backend.set(key, val)
