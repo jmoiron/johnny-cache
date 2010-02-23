@@ -1,6 +1,8 @@
 .. queryset cache main documentation, including options, enabling/disabling,
    using with raw sql and cursors, signals, etc
 
+.. module:: johnny.cache
+
 The QuerySet Cache
 ==================
 
@@ -29,17 +31,18 @@ naturally expire out faster than any "live" cache data.
 
 The QuerySet Cache supports Django versions 1.1 and 1.2.
 
-Behavior
-~~~~~~~~
+.. autoclass:: johnny.cache.QueryCacheBackend
 
-The main goals of Johnny are:
+.. autofunction:: johnny.cache.get_backend
+
+The main goals of the QuerySet Cache are:
 
 * To cache querysets forever
 * To be as simple as possible but still work
 * To not increase the conceptual load on the developer
 
 Invalidation
-------------
+~~~~~~~~~~~~
 
 Because queries are cached forever, it's absolutely essential that stale data 
 is never accessible in the cache.  Since keys are never actually deleted, but
@@ -100,12 +103,12 @@ discarded.
 Savepoints
 ----------
 
-Savepoints are planned for the 0.2 version of Johnny, but currently the only
-django backend that has support for Savepoints is the PostgreSQL backend
-(MySQL's InnoDB engine `supports savepoints
-<http://dev.mysql.com/doc/refman/5.0/en/savepoint.html>`_, but its backend 
-doesn't).  If you use savepoints, please see the :ref:`manual-invalidation`
-section.
+Preliminary savepoint support is included in version 0.1.  More testing is
+needed (and welcomed).  Currently, the only django backend that has support 
+for Savepoints is the PostgreSQL backend (MySQL's InnoDB engine 
+`supports savepoints <http://dev.mysql.com/doc/refman/5.0/en/savepoint.html>`_, 
+but its backend doesn't).  If you use savepoints, please see the 
+:ref:`manual-invalidation` section.
 
 Usage
 ~~~~~
@@ -113,14 +116,19 @@ Usage
 To enable the QuerySet Cache, enable the middleware 
 ``johnny.middleware.QueryCacheMiddleware``.  This middleware uses the `borg
 pattern <http://code.activestate.com/recipes/66531/>`_;  to remove the applied
-monkey patch, you can call ``johnny.middleware.QueryCacheMiddleware().unpatch()``.
+monkey patch, you can call ``johnny.middleware.QueryCacheMiddleware().unpatch()``,
+but the middleware will attempt to install itself again unless you also
+set ``settings.DISABLE_QUERYSET_CACHE`` to ``True``.
 
 .. _manual-invalidation:
 
 Manual Invalidation
 -------------------
 
-...
+To manually invalidate a table or a model, use ``johnny.cache.invalidate``:
+
+.. autofunction:: johnny.cache.invalidate
+
 
 Settings
 ~~~~~~~~
@@ -139,11 +147,12 @@ The QuerySet Cache defines two signals:
 
 The sender of these signals is always the ``QueryCacheBackend`` itself.
 
-.. todo: describe the signals use & functionality
-
 Customization
 ~~~~~~~~~~~~~
 
-.. todo: details on providing custom KeyGen's, etc.
+There are many aspects of the behavior of the QuerySet Cache that are pluggable,
+but no easy settings-style hooks are yet provided for them.  More ability to
+control the way Johnny functions is planned for future releases.
 
+.. todo: details on providing custom KeyGen's, etc.
 

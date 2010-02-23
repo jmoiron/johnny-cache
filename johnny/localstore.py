@@ -8,10 +8,10 @@ import fnmatch
 import threading
 
 class LocalStore(threading.local):
-    """A thread-local OpenStruct that can be used as a local cache.  This
-    module instantiates a LocalStore called 'Cache', which will be cleared
-    after every request if johnny's LocalStoreClearMiddleware is enabled.
-    It can be a thread-safe way to handle global contexts."""
+    """A thread-local OpenStruct that can be used as a local cache.  An instance
+    is located at ``johnny.cache.local``, and is cleared on every request by the
+    ``LocalStoreClearMiddleware``.  It can be a thread-safe way to handle global
+    contexts."""
     def __init__(self, **d):
         threading.local.__init__(self)
         for k,v in d.iteritems():
@@ -58,5 +58,4 @@ class LocalStore(threading.local):
 
     def __repr__(self): return repr(self.__dict__)
     def __str__(self): return str(self.__dict__)
-
 

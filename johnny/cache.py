@@ -21,8 +21,7 @@ from transaction import TransactionManager
 local = localstore.LocalStore()
 
 def get_backend():
-    """Get's a QueryCacheBackend for the current version of django using the
-    'real' cache backend provided, or django.core.cache.cache by default."""
+    """Get's a QueryCacheBackend class for the current version of django."""
     import django
     if django.VERSION[:2] == (1, 1):
         return QueryCacheBackend11
@@ -138,11 +137,13 @@ class KeyHandler(object):
 class QueryCacheBackend(object):
     """This class is engine behind the query cache. It reads the queries
     going through the django Query and returns from the cache using
-    the generation keys, otherwise from the database and caches the results.
-    Each time a model is update the keys are regenerated in the cache
-    invalidation the cache for that model and all dependent queries.
-    Note that this version of the QueryCacheBackend is for django 1.2; the
-    QueryCacheMiddleware automatically selects the right QueryCacheBackend."""
+    the generation keys, or on a miss from the database and caches the results.
+    Each time a model is updated the table keys for that model are re-created,
+    invalidating all cached querysets for that model.
+
+    There are different QueryCacheBackend's for different versions of django;
+    call ``johnny.cache.get_backend`` to automatically get the proper class.
+    """
     __shared_state = {}
     def __init__(self, cache_backend=None, keyhandler=None, keygen=None):
         self.__dict__ = self.__shared_state
