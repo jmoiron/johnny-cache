@@ -76,33 +76,36 @@ against your site to see if this type of caching is beneficial.
 Transactions
 ------------
 
-Transactions represent an interesting problem to Johnny.  Because the cache
-is global, but data written in a transaction (or read from within a transaction)
-is potentially local to the process in the transaction, this can lead to 
-several scenarios in which queries are cached that do not accurately represent
-the contents of the database:
+Transactions represent an interesting problem to caches like Johnny.  Because
+the generation keys are invalidated on write, and a transaction commit does not
+go down the same code path as our invalidation, there are a number of scenarios
+involving transactions that could cause problems.
 
-Scenario 1:
-***********
+The most obvious one is write and a read within a transaction that gets rolled
+back.  The write invalidates the cache key, the read puts new data into the
+cache, but that new data never actually sees the light of day in the database.
+There are numerous other concurrency related issues with invalidating keys
+within transactions regardless of whether or not a rollback is performed,
+because the generational key change is in memcached and thus not protected by
+the transaction itself.
 
-* Server1 enters a transaction, changes Table1;  Table1's generation is modified
-* Server2 starts a request, read's from Table1, writes to cache using new
-  generation key created by Server1
-* Server2 commits transaction, Table1 is now modified but pre-modification data
-  is cached against the *current* generation key!
+Because of this, when you enable Johnny, the ``django.db.transaction`` module
+is patched in various places to place new hooks around transaction rollback
+and committal.  When you are in what django terms a "managed transaction", ie
+a transaction that *you* are managing manually, Johnny automatically writes
+any cache keys to the `LocalStore <'localstore_cache.html'>`_ instead.  
+On commit, these keys are pushed to the global cache;  on rollback, they are
+discarded.
 
-Scenario 2:
-***********
+Savepoints
+----------
 
-* Server1 enters a transaction, changes Table1;  Table1's generation is modified
-* Server1 reads from modified Table1, writes to cache using new generation key
-* Transaction is rolled back;  future requests read cached data that was never
-  committed to the database
-
-There are other scenarios possible, but they all involve over-invalidation, and
-since this leads to decreased performance but not incorrectness, addressing
-these other issues is not a priority.
-
+Savepoints are planned for the 0.2 version of Johnny, but currently the only
+django backend that has support for Savepoints is the PostgreSQL backend
+(MySQL's InnoDB engine `supports savepoints
+<http://dev.mysql.com/doc/refman/5.0/en/savepoint.html>`_, but its backend 
+doesn't).  If you use savepoints, please see the :ref:`manual-invalidation`
+section.
 
 Usage
 ~~~~~
@@ -111,6 +114,13 @@ To enable the QuerySet Cache, enable the middleware
 ``johnny.middleware.QueryCacheMiddleware``.  This middleware uses the `borg
 pattern <http://code.activestate.com/recipes/66531/>`_;  to remove the applied
 monkey patch, you can call ``johnny.middleware.QueryCacheMiddleware().unpatch()``.
+
+.. _manual-invalidation:
+
+Manual Invalidation
+-------------------
+
+...
 
 Settings
 ~~~~~~~~
