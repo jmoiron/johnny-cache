@@ -2,3 +2,8 @@
 
 Backends
 ========
+
+.. automodule:: johnny.backends
+
+.. autoclass:: InfinityCache
+

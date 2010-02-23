@@ -1,18 +1,23 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Backend's for Johnny."""
+"""
+Johnny provides one backend, is a version of the django cache backend that
+allows a timeout of ``0`` to fall through to the "real" cache backend.  For
+``memcached``, this means "cache forever."
 
-# This is essentially from mmalone's inspiring `django-caching` application,
-#   http://github.com/mmalone/django-caching/blob/master/app/cache.py
+This is essentially the same as mmalone's inspiring ``django-caching``
+application's `cache backend monkey-patch
+<http://github.com/mmalone/django-caching/blob/master/app/cache.py>`_.
+"""
 
 from django.core.cache import cache
 from django.utils.encoding import smart_str
 
-# by checking is None rather than 'not timeout', you allow 0 to drop through
-# which memcached backend interprets as 'forever'
-
-class InfintyCache(cache.__class__):
+class InfinityCache(cache.__class__):
+    """By checking ``timeout is None`` rather than ``not timeout``, this
+    cache class allows for non-expiring cache writes on certain backends,
+    notably memcached."""
     def add(self, key, value, timeout=None):
         if isinstance(value, unicode):
             value = value.encode('utf-8')

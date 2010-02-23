@@ -16,3 +16,4 @@ The use of the class comes from the middleware that clears it at the end
 of each request.  Being a module-level object, it is a singleton.
 
 .. autoclass:: johnny.localstore.LocalStore
+
