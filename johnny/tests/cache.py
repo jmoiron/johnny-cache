@@ -215,6 +215,7 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         hit, ostart = q.get()
         self.failUnless(not hit)
         self.failUnless(ostart.title == start.title)
+        transaction.managed(False)
         transaction.leave_transaction_management()
 
     def test_transaction_rollback(self):
@@ -272,5 +273,37 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         self.failUnless(hit)
         start = Genre.objects.get(id=1)
         self.failUnless(ostart.title == start.title)
+        transaction.managed(False)
         transaction.leave_transaction_management()
 
+    def test_savepoint_rollback(self):
+        from django.db import transaction
+        from testapp.models import Genre, Publisher
+        from johnny import cache
+
+        self.failUnless(transaction.is_managed() == False)
+        self.failUnless(transaction.is_dirty() == False)
+        connection.queries = []
+        cache.local.clear()
+        transaction.enter_transaction_management()
+        transaction.managed()
+        g = Genre.objects.get(pk=1)
+        start_title = g.title
+        g.title = "Adventures in Savepoint World"
+        g.save()
+        g = Genre.objects.get(pk=1)
+        self.failUnless(g.title == "Adventures in Savepoint World")
+        sid = transaction.savepoint()
+        g.title = "In the Void"
+        g.save()
+        g = Genre.objects.get(pk=1)
+        self.failUnless(g.title == "In the Void")
+        transaction.savepoint_rollback(sid)
+        g = Genre.objects.get(pk=1)
+        self.failUnless(g.title == "Adventures in Savepoint World")
+        transaction.rollback()
+        g = Genre.objects.get(pk=1)
+        self.failUnless(g.title == start_title)
+        transaction.managed(False)
+        transaction.leave_transaction_management()
+        
