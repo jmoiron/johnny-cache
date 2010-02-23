@@ -25,15 +25,22 @@ def get_backend():
     'real' cache backend provided, or django.core.cache.cache by default."""
     import django
     if django.VERSION[:2] == (1, 1):
-        return QueryCacheBackend11()
+        return QueryCacheBackend11
     if django.VERSION[:2] == (1, 2):
-        return QueryCacheBackend()
+        return QueryCacheBackend
     raise ImproperlyConfigured("QueryCacheMiddleware cannot patch your version of django.")
 
-def invalidate(*tables):
+def invalidate(*tables, **kwargs):
     """Invalidate the current generation for one or more tables.  The arguments
-    can be either strings representing database table names or models."""
-    pass
+    can be either strings representing database table names or models.  Pass in
+    kwarg 'using' to set the database."""
+    CacheBackend = get_backend()
+    backend = CacheBackend()
+    db = kwargs.get('using', 'default')
+    resolve = lambda x: x if isinstance(x, basestring) else x._meta.db_table
+    if backend._patched:
+        for t in map(resolve, tables):
+            backend.keyhandler.invalidate_table(t, db)
 
 # The KeyGen is used only to generate keys.  Some of these keys will be used
 # directly in the cache, while others are only general purpose functions to

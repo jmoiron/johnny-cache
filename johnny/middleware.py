@@ -20,7 +20,8 @@ class QueryCacheMiddleware(object):
         self.disabled = getattr(settings, 'DISABLE_QUERYSET_CACHE', False)
         self.installed = getattr(self, 'installed', False)
         if not self.installed and not self.disabled:
-            self.query_cache_backend = cache.get_backend()
+            CacheBackend = cache.get_backend()
+            self.query_cache_backend = CacheBackend(dcache)
             self.query_cache_backend.patch()
             self.installed = True
 

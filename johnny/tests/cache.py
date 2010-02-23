@@ -149,6 +149,33 @@ class MultiModelTest(QueryCacheBase):
         books = list(Book.objects.select_related('publisher'))
         self.failUnless(len(connection.queries) == after_save + 1)
 
+    def test_invalidate(self):
+        """Test for the module-level invalidation function."""
+        from Queue import Queue as queue
+        from testapp.models import Book, Genre, Publisher
+        from johnny.cache import invalidate
+        from johnny.signals import qc_hit, qc_miss
+        q = queue()
+        def hit(*args, **kwargs):
+            q.put(True)
+        def miss(*args, **kwargs):
+            q.put(False)
+        qc_hit.connect(hit)
+        qc_miss.connect(miss)
+
+        b = Book.objects.get(id=1)
+        invalidate(Book)
+        b = Book.objects.get(id=1)
+        first, second = q.get(), q.get()
+        self.failUnless(first == second == False)
+        g = Genre.objects.get(id=1)
+        p = Publisher.objects.get(id=1)
+        invalidate('testapp_genre', Publisher)
+        g = Genre.objects.get(id=1)
+        p = Publisher.objects.get(id=1)
+        fg,fp,sg,sp = [q.get() for i in range(4)]
+        self.failUnless(fg == fp == sg == sp == False)
+
 class TransactionSupportTest(TransactionQueryCacheBase):
     fixtures = base.johnny_fixtures
 
@@ -280,7 +307,8 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         from django.db import transaction
         from testapp.models import Genre, Publisher
         from johnny import cache
-
+        if not connection.features.uses_savepoints:
+            return
         self.failUnless(transaction.is_managed() == False)
         self.failUnless(transaction.is_dirty() == False)
         connection.queries = []
@@ -306,4 +334,4 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         self.failUnless(g.title == start_title)
         transaction.managed(False)
         transaction.leave_transaction_management()
-        
+
