@@ -200,6 +200,14 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         t.start()
         t.join()
 
+    def tearDown(self):
+        from django.db import transaction
+        if transaction.is_managed():
+            if transaction.is_dirty():
+                transaction.rollback()
+            transaction.managed(False)
+            transaction.leave_transaction_management()
+
     def test_transaction_commit(self):
         """Test transaction support in Johnny."""
         from Queue import Queue as queue

@@ -5,8 +5,8 @@
 
 import django
 from django.core.exceptions import ImproperlyConfigured
-from django.core.cache import cache as dcache
-import cache
+from django.core.cache import cache as django_cache
+from johnny import cache
 
 class QueryCacheMiddleware(object):
     """This middleware class monkey-patches django's ORM to maintain
@@ -20,8 +20,7 @@ class QueryCacheMiddleware(object):
         self.disabled = getattr(settings, 'DISABLE_QUERYSET_CACHE', False)
         self.installed = getattr(self, 'installed', False)
         if not self.installed and not self.disabled:
-            CacheBackend = cache.get_backend()
-            self.query_cache_backend = CacheBackend(dcache)
+            self.query_cache_backend = cache.get_backend()(django_cache)
             self.query_cache_backend.patch()
             self.installed = True
 

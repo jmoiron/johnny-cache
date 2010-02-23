@@ -19,7 +19,7 @@ import django
 class TransactionManager(object):
     """
     TransactionManager is a wrapper around a cache_backend that is transaction aware in django.
-    Basically, if we are in a transaction it will return the locally cached version. 
+    Basically, if we are in a transaction it will return the locally cached version.
     On rollback, it will flush all local caches
     On commit, it will push them up to the cache backend
     """
@@ -206,7 +206,7 @@ class TransactionManager(object):
             if self._uses_savepoints():
                 self._commit_savepoint(sid)
         return newfun
-            
+
     def patch(self):
         """
         This function monkey patches commit and rollback
@@ -231,7 +231,6 @@ class TransactionManager(object):
     def unpatch(self):
         for fun in self._originals:
             setattr(django_transaction, fun, self._originals[fun])
-
         self._patched_var = False
 
 

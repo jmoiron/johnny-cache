@@ -34,8 +34,7 @@ def invalidate(*tables, **kwargs):
     """Invalidate the current generation for one or more tables.  The arguments
     can be either strings representing database table names or models.  Pass in
     kwarg 'using' to set the database."""
-    CacheBackend = get_backend()
-    backend = CacheBackend()
+    backend = get_backend()()
     db = kwargs.get('using', 'default')
     resolve = lambda x: x if isinstance(x, basestring) else x._meta.db_table
     if backend._patched:
@@ -147,16 +146,19 @@ class QueryCacheBackend(object):
     __shared_state = {}
     def __init__(self, cache_backend=None, keyhandler=None, keygen=None):
         self.__dict__ = self.__shared_state
-        if cache_backend is None and not hasattr(self, 'cache_backend'):
+        if keyhandler: self.kh_class = keyhandler
+        if keygen: self.kg_class = keygen
+        if not cache_backend and not hasattr(self, 'cache_backend'):
             from django.core.cache import cache as cache_backend
-        if keygen is None and not hasattr(self, 'keygen'):
-            keygen = KeyGen
-        if keyhandler is None and not hasattr(self, 'keyhandler'):
-            keyhandler = KeyHandler
-        if cache_backend: self.cache_backend = TransactionManager(cache_backend)
-        if keyhandler:
-            assert(keygen)
-            self.keyhandler = keyhandler(self.cache_backend, keygen)
+
+        if not keygen and not hasattr(self, 'kg_class'):
+            self.kg_class = KeyGen
+        if keyhandler is None and not hasattr(self, 'kh_class'):
+            self.kh_class = KeyHandler
+
+        if cache_backend:
+            self.cache_backend = TransactionManager(cache_backend)
+            self.keyhandler = self.kh_class(self.cache_backend, self.kg_class)
         self._patched = getattr(self, '_patched', False)
 
     def _monkey_select(self, original):
