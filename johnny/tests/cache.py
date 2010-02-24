@@ -9,7 +9,7 @@ from johnny import middleware
 import base
 
 # put tests in here to be included in the testing suite
-__all__ = ['SingleModelTest', 'MultiModelTest', 'TransactionSupportTest']
+__all__ = ['MultiDbTest', 'SingleModelTest', 'MultiModelTest', 'TransactionSupportTest']
 
 def _pre_setup(self):
     self.saved_DISABLE_SETTING = getattr(settings, 'DISABLE_QUERYSET_CACHE', False)
@@ -39,6 +39,135 @@ class TransactionQueryCacheBase(base.TransactionJohnnyTestCase):
         super(TransactionQueryCacheBase, self)._post_teardown()
 
 
+class MultiDbTest(TransactionQueryCacheBase):
+    multi_db = True
+    fixtures = ['genres.json', 'genres.second.json']
+
+    def test_basic_queries(self):
+        """Tests basic queries and that the cache is working for multiple db's"""
+        from testapp.models import Genre, Book, Publisher, Person
+        from django.db import connections
+        if len(getattr(settings, "DATABASES", [])) <= 1:
+            print "Skipping multi databases"
+            return 
+        self.failUnless("default" in getattr(settings, "DATABASES"))
+        self.failUnless("second" in getattr(settings, "DATABASES"))
+
+        g1 = Genre.objects.using("default").get(pk=1)
+        g1.title = "A default database"
+        g1.save()
+        g2 = Genre.objects.using("second").get(pk=1)
+        g2.title = "A second database"
+        g2.save()
+        for c in connections:
+            connections[c].queries = []
+        #fresh from cache since we saved each
+        g1 = Genre.objects.using('default').get(pk=1)
+        g2 = Genre.objects.using('second').get(pk=1)
+        for c in connections:
+            self.failUnless(len(connections[c].queries) == 1)
+        self.failUnless(g1.title == "A default database")
+        self.failUnless(g2.title == "A second database")
+        #should be a cache hit
+        g1 = Genre.objects.using('default').get(pk=1)
+        g2 = Genre.objects.using('second').get(pk=1)
+        for c in connections:
+            self.failUnless(len(connections[c].queries) == 1)
+
+    def test_transactions(self):
+        """Tests transaction rollbacks and local cache for multiple dbs"""
+        from testapp.models import Genre
+        from django.db import connections, transaction
+        if len(getattr(settings, "DATABASES", [])) <= 1:
+            print "Skipping multi databases"
+            return 
+        self.failUnless("default" in getattr(settings, "DATABASES"))
+        self.failUnless("second" in getattr(settings, "DATABASES"))
+
+        g1 = Genre.objects.using("default").get(pk=1)
+        start_g1 = g1.title
+        g2 = Genre.objects.using("second").get(pk=1)
+
+        transaction.enter_transaction_management(using='default')
+        transaction.managed(using='default')
+        transaction.enter_transaction_management(using='second')
+        transaction.managed(using='second')
+
+        g1.title = "Testing a rollback"
+        g2.title = "Testing a commit"
+        g1.save()
+        g2.save()
+        transaction.rollback(using='default')
+        transaction.commit(using='second')
+        connections['default'].queries = []
+        connections['second'].queries = []
+        #should not be a db hit due to rollback
+        g1 = Genre.objects.using("default").get(pk=1)
+        #should be a db hit due to commit
+        g2 = Genre.objects.using("second").get(pk=1)
+        self.failUnless(connections['default'].queries == [])
+        self.failUnless(len(connections['second'].queries) == 1)
+
+        self.failUnless(g1.title == start_g1)
+        self.failUnless(g2.title == "Testing a commit")
+        transaction.managed(False, "default")
+        transaction.managed(False, "second")
+        transaction.leave_transaction_management("default")
+        transaction.leave_transaction_management("second")
+
+    def test_savepoints(self):
+        """tests savepoints for multiple db's"""
+        from testapp.models import Genre
+        from django.db import connections, transaction
+        if len(getattr(settings, "DATABASES", [])) <= 1:
+            print "Skipping multi databases"
+            return 
+        self.failUnless("default" in getattr(settings, "DATABASES"))
+        self.failUnless("second" in getattr(settings, "DATABASES"))
+        g1 = Genre.objects.using("default").get(pk=1)
+        start_g1 = g1.title
+        g2 = Genre.objects.using("second").get(pk=1)
+
+        transaction.enter_transaction_management(using='default')
+        transaction.managed(using='default')
+        transaction.enter_transaction_management(using='second')
+        transaction.managed(using='second')
+
+        g1.title = "Rollback savepoint"
+        g1.save()
+
+        g2.title = "Commited savepoint"
+        g2.save()
+        sid2 = transaction.savepoint(using="second")
+
+        sid = transaction.savepoint(using="default")
+        g1.title = "Dirty text"
+        g1.save()
+
+        #should not be a hit due to rollback
+        connections["default"].queries = []
+        transaction.savepoint_rollback(sid, using="default")
+        g1 = Genre.objects.using("default").get(pk=1)
+        #self.failUnless(connections["default"].queries == [])
+        self.failUnless(g1.title == start_g1)
+
+        #will be pushed to dirty in commit
+        g2 = Genre.objects.using("second").get(pk=1)
+        self.failUnless(g2.title == "Commited savepoint")
+        transaction.savepoint_commit(sid2, using="second")
+        connections["second"].queries = []
+        g2 = Genre.objects.using("second").get(pk=1)
+        self.failUnless(connections["second"].queries == [])
+        transaction.commit(using="second")
+        g2 = Genre.objects.using("second").get(pk=1)
+        self.failUnless(connections["second"].queries == [])
+        self.failUnless(g2.title == "Commited savepoint")
+        transaction.managed(False, "default")
+        transaction.managed(False, "second")
+        transaction.leave_transaction_management("default")
+        transaction.leave_transaction_management("second")
+
+        
 class SingleModelTest(QueryCacheBase):
     fixtures = base.johnny_fixtures
 
@@ -311,6 +440,7 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         transaction.leave_transaction_management()
 
     def test_savepoint_rollback(self):
+        """Tests rollbacks of savepoints"""
         from django.db import transaction
         from testapp.models import Genre, Publisher
         from johnny import cache
@@ -343,6 +473,9 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         transaction.leave_transaction_management()
 
     def test_savepoint_commit(self):
+        """Tests a transaction commit (release)
+        The release actually pushes the savepoint back into the dirty stack,
+        but at the point it was saved in the transaction"""
         from django.db import transaction
         from testapp.models import Genre, Publisher
         from johnny import cache
@@ -363,13 +496,21 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         sid = transaction.savepoint()
         g.title = "In the Void"
         g.save()
+        connection.queries = []
+        #should be a database hit because of save in savepoint
         g = Genre.objects.get(pk=1)
+        self.failUnless(len(connection.queries) == 1)
         self.failUnless(g.title == "In the Void")
         transaction.savepoint_commit(sid)
+        #should be a cache hit against the dirty store
+        connection.queries = []
         g = Genre.objects.get(pk=1)
+        self.failUnless(connection.queries == [])
         self.failUnless(g.title == "In the Void")
         transaction.commit()
+        #should have been pushed up to cache store
         g = Genre.objects.get(pk=1)
+        self.failUnless(connection.queries == [])
         self.failUnless(g.title == "In the Void")
         transaction.managed(False)
         transaction.leave_transaction_management()

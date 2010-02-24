@@ -170,10 +170,15 @@ class QueryCacheBackend(object):
 
         # TODO: i think this parameter list might be a no-no in 2.5
         @wraps(original)
-        def newfun(cls, result_type=MULTI, *args, **kwargs):
+        def newfun(cls, *args, **kwargs):
+            if args:
+                result_type = args[0]
+            else:
+                result_type = kwargs.get('result_type', MULTI)
+
             from django.db.models.sql import compiler
             if type(cls) in (compiler.SQLInsertCompiler, compiler.SQLDeleteCompiler, compiler.SQLUpdateCompiler):
-                return original(cls, result_type, *args, **kwargs)
+                return original(cls, *args, **kwargs)
             try:
                 sql, params = cls.as_sql()
                 if not sql:
@@ -197,7 +202,8 @@ class QueryCacheBackend(object):
                     query=(sql, params, cls.query.ordering_aliases),
                     key=key)
 
-            val = original(cls, result_type, *args, **kwargs)
+            val = original(cls, *args, **kwargs)
+
             if hasattr(val, '__iter__'):
                 #Can't permanently cache lazy iterables without creating
                 #a cacheable data structure. Note that this makes them

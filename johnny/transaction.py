@@ -111,7 +111,7 @@ class TransactionManager(object):
         else:
             if self._uses_savepoints():
                 self._rollback_all_savepoints(using)
-        self._clear()
+        self._clear(using)
 
     def _patched(self, original, commit=True):
         @wraps(original)
@@ -131,11 +131,13 @@ class TransactionManager(object):
     def _uses_savepoints(self):
         return connection.features.uses_savepoints
 
-    def _sid_key(self, sid):
+    def _sid_key(self, sid, using=None):
+        if using != None:
+            return 'trans_savepoint_%s_%s'%(using, sid)
         return 'trans_savepoint_%s'%sid
 
     def _create_savepoint(self, sid, using=None):
-        key = self._sid_key(sid)
+        key = self._sid_key(sid, using)
 
         #get all local dirty items
         if self.is12():
@@ -148,14 +150,14 @@ class TransactionManager(object):
         for k, v in c.iteritems():
             self.local[key][k] = v
         #clear the dirty
-        self._clear()
+        self._clear(using)
         #append the key to the savepoint stack
         sids = self._get_sid(using)
         sids.append(key)
 
     def _rollback_savepoint(self, sid, using=None):
         sids = self._get_sid(using)
-        key = self._sid_key(sid)
+        key = self._sid_key(sid, using)
         stack = []
         try:
             popped = None
@@ -166,7 +168,7 @@ class TransactionManager(object):
             for i in stack:
                 del self.local[i]
             #clear dirty
-            self._clear()
+            self._clear(using)
         except IndexError, e:
             #key not found, don't delete from localstore, restore sid stack
             for i in stack:
@@ -175,7 +177,7 @@ class TransactionManager(object):
     def _commit_savepoint(self, sid, using=None):
         #commit is not a commit but is in reality just a clear back to that savepoint
         #and adds the items back to the dirty transaction.
-        key = self._sid_key(sid)
+        key = self._sid_key(sid, using)
         sids = self._get_sid(using)
         stack = []
         try:
@@ -209,11 +211,10 @@ class TransactionManager(object):
         else:
             c = self.local.mget('jc_*')
         backup = 'trans_dirty_store'
-        if backup not in self.local:
-            self.local[backup] = {}
+        self.local[backup] = {}
         for k, v in c.iteritems():
             self.local[backup][k] = v
-        self._clear()
+        self._clear(using)
 
     def _restore_dirty(self):
         backup = 'trans_dirty_store'
