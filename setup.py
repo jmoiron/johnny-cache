@@ -7,27 +7,25 @@ from setuptools import setup
 
 version = '0.1'
 
-path = os.path.dirname(__file__)
-if not path: path = '.'
-readme = open(os.path.join(path, 'README.rst'), 'r').read()
-
 setup(name='johnny-cache',
       version=version,
-      description=readme.split('\n')[0],
-      long_description=readme,
+      description="Django caching framework that automatically caches all"
+                  "read queries.",
+      long_description=open('README.rst').read(),
       classifiers=[
-          'Development Status :: 3 - Alpha',
+          'Development Status :: 4 - Beta',
           'Intended Audience :: Developers',
           'License :: OSI Approved :: MIT License',
           'Programming Language :: Python',
           'Operating System :: OS Independent',
           'Framework :: Django',
           'Topic :: Internet :: WWW/HTTP :: Dynamic Content',
-          'Topic :: Software Development :: Libraries',],
+          'Topic :: Software Development :: Libraries',
+          'Topic :: Software Development :: Libraries :: Python Modules',],
       keywords='django johnny cache',
       author='Jason Moiron',
       author_email='jmoiron@jmoiron.net',
-      url='http://dev.jmoiron.net/hg/johnny-cache/',
+      url='http://dev.jmoiron.net/johnny/',
       license='MIT',
       packages=['johnny'],
       scripts=[],

@@ -6,3 +6,6 @@ local_settings.py
 *.pyc
 *.swp
 *.egg-info*
+docs/_build*
+build
+dist
