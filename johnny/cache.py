@@ -16,6 +16,7 @@ except ImportError:
 
 import localstore
 import signals
+import backends
 from transaction import TransactionManager
 
 local = localstore.LocalStore()
