@@ -60,13 +60,13 @@ class KeyGen(object):
             table = table[0:68] + self.gen_key(table[68:])
         if db and len(db) > 100:
             db = db[0:68] + self.gen_key(db[68:])
-        return 'jc_table_%s_%s' % (db, table)
+        return 'jc_%s_table_%s' % (db, table)
 
     def gen_multi_key(self, values, db='default'):
         """Takes a list of generations (not table keys) and returns a key."""
-        if db:
-            values.append(db)
-        return 'jc_multi_%s' % self.gen_key(*values)
+        if db and len(db) > 100:
+            db = db[0:68] + self.gen_key(db[68:])
+        return 'jc_%s_multi_%s' % (db, self.gen_key(*values))
 
     def gen_key(self, *values):
         """Generate a key from one or more values."""
@@ -93,10 +93,10 @@ class KeyHandler(object):
     def get_single_generation(self, table, db='default'):
         """Creates a random generation value for a single table name"""
         key = self.keygen.gen_table_key(table, db)
-        val = self.cache_backend.get(key, None)
+        val = self.cache_backend.get(key, None, db)
         if val == None:
             val = self.keygen.random_generator()
-            self.cache_backend.set(key, val)
+            self.cache_backend.set(key, val, db)
         return val
 
     def get_multi_generation(self, tables, db='default'):
@@ -106,10 +106,10 @@ class KeyHandler(object):
         for table in tables:
             generations += self.get_single_generation(table, db)
         key = self.keygen.gen_multi_key(generations, db)
-        val = self.cache_backend.get(key, None)
+        val = self.cache_backend.get(key, None, db)
         if val == None:
             val = self.keygen.random_generator()
-            self.cache_backend.set(key, val)
+            self.cache_backend.set(key, val, db)
         return val
 
     def invalidate_table(self, table, db='default'):
@@ -118,14 +118,14 @@ class KeyHandler(object):
         containing the table)"""
         key = self.keygen.gen_table_key(table, db)
         val = self.keygen.random_generator()
-        self.cache_backend.set(key, val)
+        self.cache_backend.set(key, val, db)
         return val
 
-    def sql_key(self, generation, sql, params, order, result_type):
+    def sql_key(self, generation, sql, params, order, result_type, using='default'):
         """Return the specific cache key for the sql query described by the
         pieces of the query and the generation key."""
         # these keys will always look pretty opaque
-        key = 'jc_query_%s.%s' % (generation, self.keygen.gen_key(sql, params,
+        key = 'jc_%s_query_%s.%s' % (using, generation, self.keygen.gen_key(sql, params,
                 order, result_type))
         return key
 
@@ -158,7 +158,7 @@ class QueryCacheBackend(object):
             self.kh_class = KeyHandler
 
         if cache_backend:
-            self.cache_backend = TransactionManager(cache_backend)
+            self.cache_backend = TransactionManager(cache_backend, self.kg_class)
             self.keyhandler = self.kh_class(self.cache_backend, self.kg_class)
         self._patched = getattr(self, '_patched', False)
 
@@ -185,7 +185,7 @@ class QueryCacheBackend(object):
             gen_key = self.keyhandler.get_generation(*cls.query.tables, db=db)
             key = self.keyhandler.sql_key(gen_key, sql, params, cls.get_ordering(), result_type)
 
-            val = self.cache_backend.get(key, None)
+            val = self.cache_backend.get(key, None, db)
             if val is not None:
                 signals.qc_hit.send(sender=cls, tables=cls.query.tables,
                         query=(sql, params, cls.query.ordering_aliases),
@@ -203,7 +203,7 @@ class QueryCacheBackend(object):
                 #no longer lazy...
                 #todo - create a smart iterable wrapper
                 val = list(val)
-            self.cache_backend.set(key, val)
+            self.cache_backend.set(key, val, db)
             return val
         return newfun
 
