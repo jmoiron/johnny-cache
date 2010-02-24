@@ -24,36 +24,59 @@ class TransactionManager(object):
     On commit, it will push them up to the cache backend
     """
     _patched_var = False
-    def __init__(self, cache_backend):
+    def __init__(self, cache_backend, keygen):
         from johnny import cache
         self.cache_backend = cache_backend
         self.local = cache.local
+        self.keygen = keygen()
         self._originals = {}
         self._dirty_backup = {}
 
-        self._sids = []
+        self._sids = {}
 
+    def _get_sid(self, using=None):
+        if self.is12():
+            if using == None:
+                using = DEFAULT_DB_ALIAS
+            if using not in self._sids:
+                self._sids[using] = []
+        else:
+            using = 'default'
+        return self._sids[using]
+
+    def is12(self):
+        if django.VERSION[:2] == (1, 2):
+            return True
+        return False
     def is_managed(self):
         return django_transaction.is_managed()
 
-    def get(self, key, default=None):
+    def get(self, key, default=None, using=None):
         if self.is_managed() and self._patched_var:
             val = self.local.get(key, None)
             if val: return val
             if self._uses_savepoints():
-                val = self._get_from_savepoints(key)
+                val = self._get_from_savepoints(key, using)
                 if val: return val
 
         return self.cache_backend.get(key, default)
 
-    def _get_from_savepoints(self, key):
-        cp = list(self._sids)
+    def _get_from_savepoints(self, key, using=None):
+        sids = self._get_sid(using)
+        cp = list(sids)
         cp.reverse()
         for sid in cp:
             if key in self.local[sid]:
                 return self.local[sid][key]
 
-    def set(self, key, val):
+    def _trunc_using(self, using):
+        if using == None:
+            using = DEFAULT_DB_ALIAS
+        if len(using) > 100:
+            using = using[0:68] + self.keygen.gen_key(using[68:])
+        return using
+
+    def set(self, key, val, using=None):
         """
         Set will be using the generational key, so if another thread
         bumps this key, the localstore version will still be invalid.
@@ -65,8 +88,11 @@ class TransactionManager(object):
         else:
             self.cache_backend.set(key, val)
 
-    def _clear(self):
-        self.local.clear('jc_*')
+    def _clear(self, using=None):
+        if self.is12():
+            self.local.clear('jc_%s_*'%self._trunc_using(using))
+        else:
+            self.local.clear('jc_*')
 
     def _flush(self, commit=True, using=None):
         """
@@ -75,13 +101,16 @@ class TransactionManager(object):
         if commit:
             # XXX: multi-set? 
             if self._uses_savepoints():
-                self._commit_all_savepoints()
-            c = self.local.mget('jc_*')
+                self._commit_all_savepoints(using)
+            if self.is12():
+                c = self.local.mget('jc_%s_*'%self._trunc_using(using))
+            else:
+                c = self.local.mget('jc_')
             for key, value in c.iteritems():
                 self.cache_backend.set(key, value)
         else:
             if self._uses_savepoints():
-                self._rollback_all_savepoints()
+                self._rollback_all_savepoints(using)
         self._clear()
 
     def _patched(self, original, commit=True):
@@ -105,11 +134,14 @@ class TransactionManager(object):
     def _sid_key(self, sid):
         return 'trans_savepoint_%s'%sid
 
-    def _create_savepoint(self, sid):
+    def _create_savepoint(self, sid, using=None):
         key = self._sid_key(sid)
 
         #get all local dirty items
-        c = self.local.mget('jc_*')
+        if self.is12():
+            c = self.local.mget('jc_%s_*'%self._trunc_using(using))
+        else:
+            c = self.local.mget('jc_*')
         #store them to a dictionary in the localstore
         if key not in self.local:
             self.local[key] = {}
@@ -118,15 +150,17 @@ class TransactionManager(object):
         #clear the dirty
         self._clear()
         #append the key to the savepoint stack
-        self._sids.append(key)
+        sids = self._get_sid(using)
+        sids.append(key)
 
     def _rollback_savepoint(self, sid, using=None):
+        sids = self._get_sid(using)
         key = self._sid_key(sid)
         stack = []
         try:
             popped = None
             while popped != key:
-                popped = self._sids.pop()
+                popped = sids.pop()
                 stack.insert(0, popped)
             #delete items from localstore
             for i in stack:
@@ -136,38 +170,44 @@ class TransactionManager(object):
         except IndexError, e:
             #key not found, don't delete from localstore, restore sid stack
             for i in stack:
-                self._sids.insert(0, i)
+                sids.insert(0, i)
 
-    def _commit_savepoint(self, sid):
+    def _commit_savepoint(self, sid, using=None):
         #commit is not a commit but is in reality just a clear back to that savepoint
         #and adds the items back to the dirty transaction.
         key = self._sid_key(sid)
+        sids = self._get_sid(using)
         stack = []
         try:
             popped = None
             while popped != key:
-                popped = self._sids.pop()
+                popped = sids.pop()
                 stack.insert(0, popped)
             self._store_dirty()
             for i in stack:
                 for k, v in self.local[i].iteritems():
-                    self._local[k] = v
+                    self.local[k] = v
                 del self.local[i]
             self._restore_dirty()
         except IndexError, e:
             for i in stack:
-                self._sids.insert(0, i)
+                sids.insert(0, i)
 
-    def _commit_all_savepoints(self):
-        if self._sids:
-            self._commit_savepoint(self._sids[0])
+    def _commit_all_savepoints(self, using=None):
+        sids = self._get_sid(using)
+        if sids:
+            self._commit_savepoint(sids[0], using)
 
-    def _rollback_all_savepoints(self):
-        if self._sids:
-            self._rollback_savepoint(self._sids[0])
+    def _rollback_all_savepoints(self, using=None):
+        sids = self._get_sid(using)
+        if sids:
+            self._rollback_savepoint(sids[0], using)
 
-    def _store_dirty(self):
-        c = self.local.mget('jc_*')
+    def _store_dirty(self, using=None):
+        if self.is12():
+            c = self.local.mget('jc_%s_*'%self._trunc_using(using))
+        else:
+            c = self.local.mget('jc_*')
         backup = 'trans_dirty_store'
         if backup not in self.local:
             self.local[backup] = {}
@@ -189,7 +229,7 @@ class TransactionManager(object):
             else:
                 sid = original()
             if self._uses_savepoints():
-                self._create_savepoint(sid)
+                self._create_savepoint(sid, using)
             return sid
         return newfun
 
@@ -197,14 +237,22 @@ class TransactionManager(object):
         def newfun(sid, *args, **kwargs):
             original(sid, *args, **kwargs)
             if self._uses_savepoints():
-                self._rollback_savepoint(sid)
+                if len(args) == 2:
+                    using = args[1]
+                else:
+                    using = kwargs.get('using', None)
+                self._rollback_savepoint(sid, using)
         return newfun
 
     def _savepoint_commit(self, original):
         def newfun(sid, *args, **kwargs):
             original(sid, *args, **kwargs)
             if self._uses_savepoints():
-                self._commit_savepoint(sid)
+                if len(args) == 2:
+                    using = args[1]
+                else:
+                    using = kwargs.get('using', None)
+                self._commit_savepoint(sid, using)
         return newfun
 
     def patch(self):

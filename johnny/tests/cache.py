@@ -114,7 +114,6 @@ class SingleModelTest(QueryCacheBase):
         second = list(Genre.objects.filter(title__startswith='A').order_by('slug'))
         self.failUnless(len(misses) == len(hits) == 1)
 
-
 class MultiModelTest(QueryCacheBase):
     fixtures = base.johnny_fixtures
 
@@ -343,3 +342,34 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         transaction.managed(False)
         transaction.leave_transaction_management()
 
+    def test_savepoint_commit(self):
+        from django.db import transaction
+        from testapp.models import Genre, Publisher
+        from johnny import cache
+        if not connection.features.uses_savepoints:
+            return
+        self.failUnless(transaction.is_managed() == False)
+        self.failUnless(transaction.is_dirty() == False)
+        connection.queries = []
+        cache.local.clear()
+        transaction.enter_transaction_management()
+        transaction.managed()
+        g = Genre.objects.get(pk=1)
+        start_title = g.title
+        g.title = "Adventures in Savepoint World"
+        g.save()
+        g = Genre.objects.get(pk=1)
+        self.failUnless(g.title == "Adventures in Savepoint World")
+        sid = transaction.savepoint()
+        g.title = "In the Void"
+        g.save()
+        g = Genre.objects.get(pk=1)
+        self.failUnless(g.title == "In the Void")
+        transaction.savepoint_commit(sid)
+        g = Genre.objects.get(pk=1)
+        self.failUnless(g.title == "In the Void")
+        transaction.commit()
+        g = Genre.objects.get(pk=1)
+        self.failUnless(g.title == "In the Void")
+        transaction.managed(False)
+        transaction.leave_transaction_management()
