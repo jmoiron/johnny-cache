@@ -16,7 +16,6 @@ except ImportError:
 
 import localstore
 import signals
-import backends
 from transaction import TransactionManager
 
 local = localstore.LocalStore()
@@ -310,7 +309,7 @@ class QueryCacheBackend11(QueryCacheBackend):
 
             # we didn't find the value in the cache, so execute the query
             result = original(cls, result_type)
-            if cls.tables:
+            if cls.tables and not sql.startswith('UPDATE'):
                 result = list(result)
                 self.cache_backend.set(key, result)
             return result

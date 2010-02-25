@@ -67,11 +67,12 @@ class MultiDbTest(TransactionQueryCacheBase):
 
     def test_basic_queries(self):
         """Tests basic queries and that the cache is working for multiple db's"""
-        from testapp.models import Genre, Book, Publisher, Person
-        from django.db import connections
         if len(getattr(settings, "DATABASES", [])) <= 1:
             print "Skipping multi databases"
             return 
+
+        from testapp.models import Genre, Book, Publisher, Person
+        from django.db import connections
         self.failUnless("default" in getattr(settings, "DATABASES"))
         self.failUnless("second" in getattr(settings, "DATABASES"))
 
@@ -99,15 +100,15 @@ class MultiDbTest(TransactionQueryCacheBase):
     def test_transactions(self):
         """Tests transaction rollbacks and local cache for multiple dbs"""
 
+        if len(getattr(settings, "DATABASES", [])) <= 1:
+            print "Skipping multi databases"
+            return 
         from Queue import Queue as queue
         q = queue()
         other = lambda x: self._run_threaded(x, q)
 
         from testapp.models import Genre
         from django.db import connections, transaction
-        if len(getattr(settings, "DATABASES", [])) <= 1:
-            print "Skipping multi databases"
-            return 
 
         self.failUnless("default" in getattr(settings, "DATABASES"))
         self.failUnless("second" in getattr(settings, "DATABASES"))
@@ -167,6 +168,9 @@ class MultiDbTest(TransactionQueryCacheBase):
 
     def test_savepoints(self):
         """tests savepoints for multiple db's"""
+        if len(getattr(settings, "DATABASES", [])) <= 1:
+            print "Skipping multi databases"
+            return 
 
         from Queue import Queue as queue
         q = queue()
@@ -174,9 +178,6 @@ class MultiDbTest(TransactionQueryCacheBase):
 
         from testapp.models import Genre
         from django.db import connections, transaction
-        if len(getattr(settings, "DATABASES", [])) <= 1:
-            print "Skipping multi databases"
-            return 
         self.failUnless("default" in getattr(settings, "DATABASES"))
         self.failUnless("second" in getattr(settings, "DATABASES"))
         g1 = Genre.objects.using("default").get(pk=1)
