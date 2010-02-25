@@ -27,7 +27,7 @@ setup(name='johnny-cache',
       author_email='jmoiron@jmoiron.net',
       url='http://dev.jmoiron.net/johnny/',
       license='MIT',
-      packages=['johnny'],
+      packages=['johnny', 'johnny.backends'],
       scripts=[],
       # setuptools specific
       zip_safe=False,
