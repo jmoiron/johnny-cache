@@ -43,6 +43,28 @@ class MultiDbTest(TransactionQueryCacheBase):
     multi_db = True
     fixtures = ['genres.json', 'genres.second.json']
 
+    def _run_threaded(self, query, queue):
+        """Runs a query (as a string) from testapp in another thread and
+        puts (hit?, result) on the provided queue."""
+        from threading import Thread
+        def _inner(_query):
+            from testapp.models import Genre, Book, Publisher, Person
+            from johnny.signals import qc_hit, qc_miss
+            from johnny.cache import local
+            msg = []
+            def hit(*args, **kwargs):
+                msg.append(True)
+            def miss(*args, **kwargs):
+                msg.append(False)
+            qc_hit.connect(hit)
+            qc_miss.connect(miss)
+            obj = eval(_query)
+            msg.append(obj)
+            queue.put(msg)
+        t = Thread(target=_inner, args=(query,))
+        t.start()
+        t.join()
+
     def test_basic_queries(self):
         """Tests basic queries and that the cache is working for multiple db's"""
         from testapp.models import Genre, Book, Publisher, Person
@@ -76,11 +98,17 @@ class MultiDbTest(TransactionQueryCacheBase):
 
     def test_transactions(self):
         """Tests transaction rollbacks and local cache for multiple dbs"""
+
+        from Queue import Queue as queue
+        q = queue()
+        other = lambda x: self._run_threaded(x, q)
+
         from testapp.models import Genre
         from django.db import connections, transaction
         if len(getattr(settings, "DATABASES", [])) <= 1:
             print "Skipping multi databases"
             return 
+
         self.failUnless("default" in getattr(settings, "DATABASES"))
         self.failUnless("second" in getattr(settings, "DATABASES"))
 
@@ -97,26 +125,53 @@ class MultiDbTest(TransactionQueryCacheBase):
         g2.title = "Testing a commit"
         g1.save()
         g2.save()
+
+        #test outside of transaction, should be cache miss and 
+        #not contain the local changes
+        other("Genre.objects.using('default').get(pk=1)")
+        hit, ostart = q.get()
+        self.failUnless(ostart.title == start_g1)
+        self.failUnless(hit)
+
         transaction.rollback(using='default')
         transaction.commit(using='second')
+        transaction.managed(False, "default")
+        transaction.managed(False, "second")
+
+        #other thread should have seen rollback
+        other("Genre.objects.using('default').get(pk=1)")
+        hit, ostart = q.get()
+        self.failUnless(ostart.title == start_g1)
+        self.failUnless(hit)
+
         connections['default'].queries = []
         connections['second'].queries = []
-        #should not be a db hit due to rollback
+        #should be a cache hit due to rollback
         g1 = Genre.objects.using("default").get(pk=1)
         #should be a db hit due to commit
         g2 = Genre.objects.using("second").get(pk=1)
         self.failUnless(connections['default'].queries == [])
         self.failUnless(len(connections['second'].queries) == 1)
 
+        #other thread sould now be accessing the cache after the get
+        #from the commit.
+        other("Genre.objects.using('second').get(pk=1)")
+        hit, ostart = q.get()
+        self.failUnless(ostart.title == g2.title)
+        self.failUnless(hit)
+
         self.failUnless(g1.title == start_g1)
         self.failUnless(g2.title == "Testing a commit")
-        transaction.managed(False, "default")
-        transaction.managed(False, "second")
         transaction.leave_transaction_management("default")
         transaction.leave_transaction_management("second")
 
     def test_savepoints(self):
         """tests savepoints for multiple db's"""
+
+        from Queue import Queue as queue
+        q = queue()
+        other = lambda x: self._run_threaded(x, q)
+
         from testapp.models import Genre
         from django.db import connections, transaction
         if len(getattr(settings, "DATABASES", [])) <= 1:
@@ -136,7 +191,7 @@ class MultiDbTest(TransactionQueryCacheBase):
         g1.title = "Rollback savepoint"
         g1.save()
 
-        g2.title = "Commited savepoint"
+        g2.title = "Committed savepoint"
         g2.save()
         sid2 = transaction.savepoint(using="second")
 
@@ -144,26 +199,51 @@ class MultiDbTest(TransactionQueryCacheBase):
         g1.title = "Dirty text"
         g1.save()
 
+        #other thread should see the original key and cache object from memcache,
+        #not the local cache version
+        other("Genre.objects.using('default').get(pk=1)")
+        hit, ostart = q.get()
+        self.failUnless(hit)
+        self.failUnless(ostart.title == start_g1)
+        
         #should not be a hit due to rollback
         connections["default"].queries = []
         transaction.savepoint_rollback(sid, using="default")
         g1 = Genre.objects.using("default").get(pk=1)
-        #self.failUnless(connections["default"].queries == [])
+
         self.failUnless(g1.title == start_g1)
 
         #will be pushed to dirty in commit
         g2 = Genre.objects.using("second").get(pk=1)
-        self.failUnless(g2.title == "Commited savepoint")
+        self.failUnless(g2.title == "Committed savepoint")
         transaction.savepoint_commit(sid2, using="second")
+
+        #other thread should still see original version even 
+        #after savepoint commit
+        other("Genre.objects.using('second').get(pk=1)")
+        hit, ostart = q.get()
+        self.failUnless(hit)
+        self.failUnless(ostart.title == start_g1)
+
         connections["second"].queries = []
         g2 = Genre.objects.using("second").get(pk=1)
         self.failUnless(connections["second"].queries == [])
+
         transaction.commit(using="second")
+        transaction.managed(False, "second")
+
         g2 = Genre.objects.using("second").get(pk=1)
         self.failUnless(connections["second"].queries == [])
-        self.failUnless(g2.title == "Commited savepoint")
+        self.failUnless(g2.title == "Committed savepoint")
+
+        #now committed and cached, other thread should reflect new title
+        #without a hit to the db
+        other("Genre.objects.using('second').get(pk=1)")
+        hit, ostart = q.get()
+        self.failUnless(ostart.title == g2.title)
+        self.failUnless(hit)
+
         transaction.managed(False, "default")
-        transaction.managed(False, "second")
         transaction.leave_transaction_management("default")
         transaction.leave_transaction_management("second")
 

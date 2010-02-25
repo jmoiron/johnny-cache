@@ -32,17 +32,27 @@ class TransactionManager(object):
         self._originals = {}
         self._dirty_backup = {}
 
-        self._sids = {}
+        self.local['trans_sids'] = {}
 
     def _get_sid(self, using=None):
-        if self.is12():
-            if using == None:
-                using = DEFAULT_DB_ALIAS
-            if using not in self._sids:
-                self._sids[using] = []
+        if 'trans_sids' not in self.local:
+            self.local['trans_sids'] = {}
+        d = self.local['trans_sids']
+        if self.is12() and using == None:
+            using = DEFAULT_DB_ALIAS
         else:
             using = 'default'
-        return self._sids[using]
+        if using not in d:
+            d[using] = []
+        return d[using]
+
+    def _clear_sid_stack(self, using=None):
+        if self.is12() and using == None:
+            using = DEFAULT_DB_ALIAS
+        else:
+            using = 'default'
+        if using in self.local.get('trans_sids', {}):
+            del self.local['trans_sids']
 
     def is12(self):
         if django.VERSION[:2] == (1, 2):
@@ -112,6 +122,7 @@ class TransactionManager(object):
             if self._uses_savepoints():
                 self._rollback_all_savepoints(using)
         self._clear(using)
+        self._clear_sid_stack(using)
 
     def _patched(self, original, commit=True):
         @wraps(original)
@@ -185,12 +196,12 @@ class TransactionManager(object):
             while popped != key:
                 popped = sids.pop()
                 stack.insert(0, popped)
-            self._store_dirty()
+            self._store_dirty(using)
             for i in stack:
                 for k, v in self.local[i].iteritems():
                     self.local[k] = v
                 del self.local[i]
-            self._restore_dirty()
+            self._restore_dirty(using)
         except IndexError, e:
             for i in stack:
                 sids.insert(0, i)
@@ -210,14 +221,14 @@ class TransactionManager(object):
             c = self.local.mget('jc_%s_*'%self._trunc_using(using))
         else:
             c = self.local.mget('jc_*')
-        backup = 'trans_dirty_store'
+        backup = 'trans_dirty_store_%s'%self._trunc_using(using)
         self.local[backup] = {}
         for k, v in c.iteritems():
             self.local[backup][k] = v
         self._clear(using)
 
-    def _restore_dirty(self):
-        backup = 'trans_dirty_store'
+    def _restore_dirty(self, using=None):
+        backup = 'trans_dirty_store_%s'%self._trunc_using(using)
         for k, v in self.local.get(backup, {}).iteritems():
             self.local[k] = v
         del self.local[backup]
@@ -249,8 +260,8 @@ class TransactionManager(object):
         def newfun(sid, *args, **kwargs):
             original(sid, *args, **kwargs)
             if self._uses_savepoints():
-                if len(args) == 2:
-                    using = args[1]
+                if len(args) == 1:
+                    using = args[0]
                 else:
                     using = kwargs.get('using', None)
                 self._commit_savepoint(sid, using)

@@ -186,12 +186,11 @@ class QueryCacheBackend(object):
             except EmptyResultSet:
                 if result_type == MULTI:
                     return query.empty_iter()
-
             db = getattr(cls, 'using', 'default')
             gen_key = self.keyhandler.get_generation(*cls.query.tables, db=db)
-            key = self.keyhandler.sql_key(gen_key, sql, params, cls.get_ordering(), result_type)
-
+            key = self.keyhandler.sql_key(gen_key, sql, params, cls.get_ordering(), result_type, db)
             val = self.cache_backend.get(key, None, db)
+
             if val is not None:
                 signals.qc_hit.send(sender=cls, tables=cls.query.tables,
                         query=(sql, params, cls.query.ordering_aliases),
