@@ -13,6 +13,8 @@ try:
 except ImportError:
     from django.utils.functional import wraps  # Python 2.3, 2.4 fallback.
 
+
+from django.conf import settings
 import django
 
 
@@ -25,10 +27,13 @@ class TransactionManager(object):
     """
     _patched_var = False
     def __init__(self, cache_backend, keygen):
+        self.timeout = getattr(settings, 'JOHNNY_MIDDLEWARE_SECONDS', 0)
+        self.prefix = getattr(settings, 'JOHNNY_MIDDLEWARE_KEY_PREFIX', 'jc_')
+
         from johnny import cache
         self.cache_backend = cache_backend
         self.local = cache.local
-        self.keygen = keygen()
+        self.keygen = keygen(self.prefix)
         self._originals = {}
         self._dirty_backup = {}
 
@@ -88,23 +93,25 @@ class TransactionManager(object):
             using = using[0:68] + self.keygen.gen_key(using[68:])
         return using
 
-    def set(self, key, val, using=None):
+    def set(self, key, val, timeout = 0, using=None):
         """
         Set will be using the generational key, so if another thread
         bumps this key, the localstore version will still be invalid.
         If the key is bumped during a transaction it will be new
         to the global cache on commit, so it will still be a bump.
         """
+        if not timeout:
+            timeout = self.timeout
         if self.is_managed() and self._patched_var:
             self.local[key] = val
         else:
-            self.cache_backend.set(key, val)
+            self.cache_backend.set(key, val, timeout)
 
     def _clear(self, using=None):
         if self.is12():
-            self.local.clear('jc_%s_*'%self._trunc_using(using))
+            self.local.clear('%s_%s_*'%(self.prefix, self._trunc_using(using)))
         else:
-            self.local.clear('jc_*')
+            self.local.clear('%s_*'%self.prefix)
 
     def _flush(self, commit=True, using=None):
         """
@@ -115,11 +122,11 @@ class TransactionManager(object):
             if self._uses_savepoints():
                 self._commit_all_savepoints(using)
             if self.is12():
-                c = self.local.mget('jc_%s_*'%self._trunc_using(using))
+                c = self.local.mget('%s_%s_*'%(self.prefix, self._trunc_using(using)))
             else:
-                c = self.local.mget('jc_*')
+                c = self.local.mget('%s_*'%self.prefix)
             for key, value in c.iteritems():
-                self.cache_backend.set(key, value)
+                self.cache_backend.set(key, value, self.timeout)
         else:
             if self._uses_savepoints():
                 self._rollback_all_savepoints(using)
@@ -154,9 +161,9 @@ class TransactionManager(object):
 
         #get all local dirty items
         if self.is12():
-            c = self.local.mget('jc_%s_*'%self._trunc_using(using))
+            c = self.local.mget('%s_%s_*'%(self.prefix, self._trunc_using(using)))
         else:
-            c = self.local.mget('jc_*')
+            c = self.local.mget('%s_*'%self.prefix)
         #store them to a dictionary in the localstore
         if key not in self.local:
             self.local[key] = {}
@@ -220,9 +227,9 @@ class TransactionManager(object):
 
     def _store_dirty(self, using=None):
         if self.is12():
-            c = self.local.mget('jc_%s_*'%self._trunc_using(using))
+            c = self.local.mget('%s_%s_*'%(self.prefix, self._trunc_using(using)))
         else:
-            c = self.local.mget('jc_*')
+            c = self.local.mget('%s_*'%self.prefix)
         backup = 'trans_dirty_store_%s'%self._trunc_using(using)
         self.local[backup] = {}
         for k, v in c.iteritems():

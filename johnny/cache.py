@@ -14,6 +14,7 @@ try:
 except ImportError:
     from md5 import md5
 
+from django.conf import settings 
 import localstore
 import signals
 from transaction import TransactionManager
@@ -47,6 +48,9 @@ def invalidate(*tables, **kwargs):
 class KeyGen(object):
     """This class is responsible for generating keys."""
 
+    def __init__(self, prefix):
+        self.prefix = prefix
+
     def random_generator(self):
         """Creates a random unique id."""
         return self.gen_key(str(uuid4()))
@@ -60,13 +64,13 @@ class KeyGen(object):
             table = table[0:68] + self.gen_key(table[68:])
         if db and len(db) > 100:
             db = db[0:68] + self.gen_key(db[68:])
-        return 'jc_%s_table_%s' % (db, table)
+        return '%s_%s_table_%s' % (self.prefix, db, table)
 
     def gen_multi_key(self, values, db='default'):
         """Takes a list of generations (not table keys) and returns a key."""
         if db and len(db) > 100:
             db = db[0:68] + self.gen_key(db[68:])
-        return 'jc_%s_multi_%s' % (db, self.gen_key(*values))
+        return '%s_%s_multi_%s' % (self.prefix, db, self.gen_key(*values))
 
     def gen_key(self, *values):
         """Generate a key from one or more values."""
@@ -79,8 +83,9 @@ class KeyHandler(object):
     """Handles pulling and invalidating the key from from the cache based
     on the table names.  Higher-level logic dealing with johnny cache specific
     keys go in this class."""
-    def __init__(self, cache_backend, keygen=KeyGen):
-        self.keygen = keygen()
+    def __init__(self, cache_backend, keygen=KeyGen, prefix=None):
+        self.prefix = prefix
+        self.keygen = keygen(prefix)
         self.cache_backend = cache_backend
 
     def get_generation(self, *tables, **kwargs):
@@ -96,7 +101,7 @@ class KeyHandler(object):
         val = self.cache_backend.get(key, None, db)
         if val == None:
             val = self.keygen.random_generator()
-            self.cache_backend.set(key, val, db)
+            self.cache_backend.set(key, val, 0, db)
         return val
 
     def get_multi_generation(self, tables, db='default'):
@@ -109,7 +114,7 @@ class KeyHandler(object):
         val = self.cache_backend.get(key, None, db)
         if val == None:
             val = self.keygen.random_generator()
-            self.cache_backend.set(key, val, db)
+            self.cache_backend.set(key, val, 0, db)
         return val
 
     def invalidate_table(self, table, db='default'):
@@ -118,14 +123,14 @@ class KeyHandler(object):
         containing the table)"""
         key = self.keygen.gen_table_key(table, db)
         val = self.keygen.random_generator()
-        self.cache_backend.set(key, val, db)
+        self.cache_backend.set(key, val, 0, db)
         return val
 
     def sql_key(self, generation, sql, params, order, result_type, using='default'):
         """Return the specific cache key for the sql query described by the
         pieces of the query and the generation key."""
         # these keys will always look pretty opaque
-        key = 'jc_%s_query_%s.%s' % (using, generation, self.keygen.gen_key(sql, params,
+        key = '%s_%s_query_%s.%s' % (self.prefix, using, generation, self.keygen.gen_key(sql, params,
                 order, result_type))
         return key
 
@@ -147,6 +152,7 @@ class QueryCacheBackend(object):
     __shared_state = {}
     def __init__(self, cache_backend=None, keyhandler=None, keygen=None):
         self.__dict__ = self.__shared_state
+        self.prefix = getattr(settings, 'JOHNNY_MIDDLEWARE_KEY_PREFIX', 'jc_')
         if keyhandler: self.kh_class = keyhandler
         if keygen: self.kg_class = keygen
         if not cache_backend and not hasattr(self, 'cache_backend'):
@@ -159,7 +165,7 @@ class QueryCacheBackend(object):
 
         if cache_backend:
             self.cache_backend = TransactionManager(cache_backend, self.kg_class)
-            self.keyhandler = self.kh_class(self.cache_backend, self.kg_class)
+            self.keyhandler = self.kh_class(self.cache_backend, self.kg_class, self.prefix)
         self._patched = getattr(self, '_patched', False)
 
     def _monkey_select(self, original):
@@ -208,7 +214,7 @@ class QueryCacheBackend(object):
                 #no longer lazy...
                 #todo - create a smart iterable wrapper
                 val = list(val)
-            self.cache_backend.set(key, val, db)
+            self.cache_backend.set(key, val, 0, db)
             return val
         return newfun
 

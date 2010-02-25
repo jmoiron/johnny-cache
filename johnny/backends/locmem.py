@@ -10,15 +10,16 @@ computer will last.  On a 64 bit machine, your cache will expire about
 """
 
 from django.core.cache.backends import locmem
+from django.utils.encoding import smart_str
 import sys
 
 class CacheClass(locmem.CacheClass):
     def add(self, key, value, timeout=None):
         timeout = sys.maxint if timeout is 0 else timeout
-        return self._cache.add(smart_str(key), value, timeout)
+        return super(CacheClass, self).add(smart_str(key), value, timeout)
 
     def set(self, key, value, timeout=None):
         timeout = sys.maxint if timeout is 0 else timeout
-        self._cache.set(smart_str(key), value, timeout)
+        return super(CacheClass, self).set(smart_str(key), value, timeout)
 
 
