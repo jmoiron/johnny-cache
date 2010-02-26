@@ -385,6 +385,43 @@ class MultiModelTest(QueryCacheBase):
         fg,fp,sg,sp = [q.get() for i in range(4)]
         self.failUnless(fg == fp == sg == sp == False)
 
+    def test_many_to_many(self):
+        from testapp.models import Book, Person
+        b = Book.objects.get(pk=1)
+        p1 = Person.objects.get(pk=1)
+        p2 = Person.objects.get(pk=2)
+        b.authors.add(p1)
+        connection.queries = []
+
+        list(b.authors.all())
+
+        #many to many should be invalidated
+        self.failUnless(len(connection.queries) == 1)
+        b.authors.remove(p1)
+        b = Book.objects.get(pk=1)
+        list(b.authors.all())
+        #can't determine the queries here, 1.1 and 1.2 uses them differently
+
+        connection.queries = []
+        #many to many should be invalidated, 
+        #person is not invalidated since we just want
+        #the many to many table to be
+        p1 = Person.objects.get(pk=1)
+        self.failUnless(len(connection.queries) == 0)
+
+        p1.books.add(b)
+        connection.queries = []
+
+        #many to many should be invalidated,
+        #this is the first query
+        list(p1.books.all())
+        b = Book.objects.get(pk=1)
+        self.failUnless(len(connection.queries) == 1)
+
+        #query should be cached
+        list(p1.books.all())
+        self.failUnless(len(connection.queries) == 1)
+
 class TransactionSupportTest(TransactionQueryCacheBase):
     fixtures = base.johnny_fixtures
 

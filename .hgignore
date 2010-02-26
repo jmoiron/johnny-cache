@@ -5,6 +5,7 @@ django
 local_settings.py
 *.pyc
 *.swp
+*.swo
 *.egg-info*
 docs/_build*
 build
