@@ -1,7 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Infinite cache support for memcached."""
+"""Memcached cache class that caches forever when passed a timeout of 0.
+
+To use, change your ``CACHE_BACKEND`` setting to something like this::
+
+    CACHE_BACKEND="johnny.backends.memcached://.."
+"""
 
 from django.core.cache.backends import memcached
 from django.utils.encoding import smart_str
