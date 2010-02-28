@@ -9,7 +9,7 @@ version = '0.1'
 
 setup(name='johnny-cache',
       version=version,
-      description="Django caching framework that automatically caches all"
+      description="Django caching framework that automatically caches all "
                   "read queries.",
       long_description=open('README.rst').read(),
       classifiers=[
