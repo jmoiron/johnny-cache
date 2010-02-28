@@ -419,8 +419,28 @@ class MultiModelTest(QueryCacheBase):
         self.failUnless(len(connection.queries) == 1)
 
         #query should be cached
-        list(p1.books.all())
+        self.failUnless(len(list(p1.books.all())) == 1)
         self.failUnless(len(connection.queries) == 1)
+
+        #testing clear
+        b.authors.clear()
+        self.failUnless(b.authors.all().count() == 0)
+
+        self.failUnless(p1.books.all().count() == 0)
+
+        b.authors.add(p1)
+        self.failUnless(b.authors.all().count() == 1)
+        queries = len(connection.queries)
+
+        #should be cached
+        b.authors.all().count()
+        self.failUnless(len(connection.queries) == queries)
+
+        self.failUnless(p1.books.all().count() == 1)
+
+        p1.books.clear()
+        self.failUnless(b.authors.all().count() == 0)
+
 
 class TransactionSupportTest(TransactionQueryCacheBase):
     fixtures = base.johnny_fixtures
