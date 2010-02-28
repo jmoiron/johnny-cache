@@ -350,7 +350,7 @@ class QueryCacheBackend11(QueryCacheBackend):
     def _patched_m2m_func(self, original):
         def f(cls, *args, **kwargs):
             val = original(cls, *args, **kwargs)
-            signals.qc_m2m_change.send(sender=cls, instance=cls.join_table)
+            signals.qc_m2m_change.send(sender=cls, instance=cls.join_table.strip('"'))
             return val
         return f
 

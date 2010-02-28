@@ -429,6 +429,7 @@ class MultiModelTest(QueryCacheBase):
         self.failUnless(p1.books.all().count() == 0)
 
         b.authors.add(p1)
+
         self.failUnless(b.authors.all().count() == 1)
         queries = len(connection.queries)
 
