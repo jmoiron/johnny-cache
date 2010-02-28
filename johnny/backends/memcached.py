@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Memcached cache class that caches forever when passed a timeout of 0.
-
-To use, change your ``CACHE_BACKEND`` setting to something like this::
+"""Infinite caching memcached class.  Caches forever when passed a timeout
+of 0. To use, change your ``CACHE_BACKEND`` setting to something like this::
 
     CACHE_BACKEND="johnny.backends.memcached://.."
 """

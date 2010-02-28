@@ -8,8 +8,7 @@ The QuerySet Cache
 
 QuerySet caching is the automatic caching of all database reads.  Conceptually, 
 it works very similar to the built-in write-invalidate queryset caching that 
-is present in your RDBMS.  Although it is not typically required to modify,
-it is located in ``johnny.cache``.
+is present in your RDBMS. 
 
 When a read (``SELECT``) is made from one or more tables, that read is cached. 
 When a write (``INSERT``, ``UPDATE``, etc) is made against that table, the 
@@ -133,9 +132,29 @@ To manually invalidate a table or a model, use ``johnny.cache.invalidate``:
 Settings
 ~~~~~~~~
 
-There is only one additional setting available for the QuerySet Cache:
-``DISABLE_QUERYSET_CACHE``, which will prevent the middleware from applying
-its patch.
+The following settings are available for the QuerySet Cache:
+
+* ``DISABLE_QUERYSET_CACHE``
+* ``JOHNNY_MIDDLEWARE_KEY_PREFIX``
+* ``JOHNNY_MIDDLEWARE_SECONDS``
+
+``DISABLE_QUERYSET_CACHE`` will disable the QuerySet cache even if the
+middleware is installed.  This is mostly to make it easy for other modules
+to disable the queryset cache without re-creating the entire middleware
+stack and then removing the QuerySet cache middleware.
+
+``JOHNNY_MIDDLEWARE_KEY_PREFIX``, default "jc", is to set the prefix for
+Johnny cache.  It's *very important* that if you are running multiple apps
+in the same memcached pool that you use this setting on each app so that 
+tables with the same name in each app (like Django's built in contrib apps)
+don't clobber each other in the cache.
+
+``JOHNNY_MIDDLEWARE_SECONDS``, default ``0``, is the period that Johnny
+will cache both its generational keys *and* its query cache results.  Since
+the design goal of Johnny was to be able to maintain a consistent cache at
+all times, the default behavior is to cache everything *forever*.  Note that
+if you are not using one of Johnny's `custom backends <backends.html>`_, the 
+default value of ``0`` will work differently on different backends.
 
 Signals
 ~~~~~~~

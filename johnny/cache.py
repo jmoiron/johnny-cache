@@ -140,7 +140,7 @@ class KeyHandler(object):
 # XXX: Thread safety concerns?  Should we only need to patch once per process?
 
 class QueryCacheBackend(object):
-    """This class is engine behind the query cache. It reads the queries
+    """This class is the engine behind the query cache. It reads the queries
     going through the django Query and returns from the cache using
     the generation keys, or on a miss from the database and caches the results.
     Each time a model is updated the table keys for that model are re-created,
@@ -365,6 +365,5 @@ class QueryCacheBackend11(QueryCacheBackend):
                         self._patched_m2m_func(getattr(related_manager, item))
                        )
             related_manager._johnny_patched = True
-                                                       
             return related_manager
         return f
