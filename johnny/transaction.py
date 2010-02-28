@@ -28,7 +28,7 @@ class TransactionManager(object):
     _patched_var = False
     def __init__(self, cache_backend, keygen):
         self.timeout = getattr(settings, 'JOHNNY_MIDDLEWARE_SECONDS', 0)
-        self.prefix = getattr(settings, 'JOHNNY_MIDDLEWARE_KEY_PREFIX', 'jc_')
+        self.prefix = getattr(settings, 'JOHNNY_MIDDLEWARE_KEY_PREFIX', 'jc')
 
         from johnny import cache
         self.cache_backend = cache_backend

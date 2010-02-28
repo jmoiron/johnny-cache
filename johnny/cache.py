@@ -109,7 +109,7 @@ class KeyHandler(object):
         value for the generation"""
         generations = []
         for table in tables:
-            generations += self.get_single_generation(table, db)
+            generations.append(self.get_single_generation(table, db))
         key = self.keygen.gen_multi_key(generations, db)
         val = self.cache_backend.get(key, None, db)
         if val == None:
@@ -152,7 +152,7 @@ class QueryCacheBackend(object):
     __shared_state = {}
     def __init__(self, cache_backend=None, keyhandler=None, keygen=None):
         self.__dict__ = self.__shared_state
-        self.prefix = getattr(settings, 'JOHNNY_MIDDLEWARE_KEY_PREFIX', 'jc_')
+        self.prefix = getattr(settings, 'JOHNNY_MIDDLEWARE_KEY_PREFIX', 'jc')
         if keyhandler: self.kh_class = keyhandler
         if keygen: self.kg_class = keygen
         if not cache_backend and not hasattr(self, 'cache_backend'):
@@ -261,6 +261,9 @@ class QueryCacheBackend(object):
         self.cache_backend.unpatch()
         self._patched = False
 
+    def invalidate_m2m(self, instance, **kwargs):
+        if self._patched:
+            self.keyhandler.invalidate_table(instance)
     def invalidate(self, instance, **kwargs):
         if self._patched:
             self.keyhandler.invalidate_table(instance._meta.db_table)
@@ -269,6 +272,8 @@ class QueryCacheBackend(object):
         from django.db.models import signals
         signals.post_save.connect(self.invalidate, sender=None)
         signals.post_delete.connect(self.invalidate, sender=None)
+        import signals as johnny_signals
+        johnny_signals.qc_m2m_change.connect(self.invalidate_m2m, sender=None)
 
     def flush_query_cache(self):
         from django.db import connection
@@ -323,10 +328,13 @@ class QueryCacheBackend11(QueryCacheBackend):
 
     def patch(self):
         from django.db.models import sql
+        from django.db.models.fields import related
         if self._patched:
             return
         self._original = sql.Query.execute_sql
+        self._original_m2m = related.create_many_related_manager
         sql.Query.execute_sql = self._monkey_execute_sql(sql.Query.execute_sql)
+        related.create_many_related_manager = self._patched_m2m(related.create_many_related_manager)
         self._handle_signals()
         self.cache_backend.patch()
         self._patched = True
@@ -339,3 +347,24 @@ class QueryCacheBackend11(QueryCacheBackend):
         self.cache_backend.unpatch()
         self._patched = False
 
+    def _patched_m2m_func(self, original):
+        def f(cls, *args, **kwargs):
+            val = original(cls, *args, **kwargs)
+            signals.qc_m2m_change.send(sender=cls, instance=cls.join_table.strip('"'))
+            return val
+        return f
+
+    def _patched_m2m(self, original):
+        def f(*args, **kwargs):
+            related_manager = original(*args, **kwargs)
+            if getattr(related_manager, '_johnny_patched', None):
+                return related_manager
+            for i in ('add', 'remove', 'clear'):
+                item = '_%s_items'%i
+                setattr(related_manager, item,
+                        self._patched_m2m_func(getattr(related_manager, item))
+                       )
+            related_manager._johnny_patched = True
+                                                       
+            return related_manager
+        return f

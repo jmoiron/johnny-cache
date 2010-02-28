@@ -35,6 +35,7 @@ class LocalStore(threading.local):
     def iteritems(self): return self.__dict__.iteritems()
     def get(self, *args): return self.__dict__.get(*args)
     def update(self, d): self.__dict__.update(d)
+    def setdefault(self, name, value): return self.__dict__.setdefault(name, value)
     def mget(self, pat=None):
         """Get a dictionary mapping of all k:v pairs with key matching
         glob style expression `pat`."""
