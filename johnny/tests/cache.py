@@ -427,7 +427,6 @@ class MultiModelTest(QueryCacheBase):
         self.failUnless(b.authors.all().count() == 0)
         self.failUnless(p1.books.all().count() == 0)
         b.authors.add(p1)
-        import ipdb; ipdb.set_trace();
         self.failUnless(b.authors.all().count() == 1)
         queries = len(connection.queries)
 
