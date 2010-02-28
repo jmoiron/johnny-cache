@@ -19,8 +19,10 @@ class LocalStoreTest(TestCase):
         self.assertEquals(len(store), 5)
         self.assertEquals(sorted(list(store)),
                           sorted(store.keys()))
+        self.assertEquals(store.setdefault('key6', 'value6'), 'value6')
+        self.assertEquals(store['key6'], 'value6')
         del store['key2']
-        self.assertEquals(len(store), 4)
+        self.assertEquals(len(store), 5)
         store.clear()
         self.assertEquals(len(store), 0)
 
