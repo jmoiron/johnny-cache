@@ -425,20 +425,16 @@ class MultiModelTest(QueryCacheBase):
         #testing clear
         b.authors.clear()
         self.failUnless(b.authors.all().count() == 0)
-
         self.failUnless(p1.books.all().count() == 0)
-
         b.authors.add(p1)
-
+        import ipdb; ipdb.set_trace();
         self.failUnless(b.authors.all().count() == 1)
         queries = len(connection.queries)
 
         #should be cached
         b.authors.all().count()
         self.failUnless(len(connection.queries) == queries)
-
         self.failUnless(p1.books.all().count() == 1)
-
         p1.books.clear()
         self.failUnless(b.authors.all().count() == 0)
 
