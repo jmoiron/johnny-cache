@@ -320,7 +320,7 @@ class QueryCacheBackend11(QueryCacheBackend):
 
             # we didn't find the value in the cache, so execute the query
             result = original(cls, result_type)
-            if cls.tables and not sql.startswith('UPDATE'):
+            if cls.tables and not sql.startswith('UPDATE') and not sql.startswith('DELETE'):
                 result = list(result)
                 self.cache_backend.set(key, result)
             return result
