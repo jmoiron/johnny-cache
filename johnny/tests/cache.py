@@ -283,6 +283,21 @@ class SingleModelTest(QueryCacheBase):
         self.failUnless(pubs == pubs2)
         self.failUnless(len(connection.queries) == 2)
 
+    def test_delete(self):
+        """Test that a database delete clears a table cache."""
+        from testapp.models import Genre
+        g1 = Genre.objects.get(pk=1)
+        begin = Genre.objects.all().count()
+        g1.delete()
+        try:
+            self.assertRaises(Genre.objects.get(pk=1), Genre.DoesNotExist)
+        except Genre.DoesNotExist:
+            pass
+        connection.queries = []
+        self.failUnless(Genre.objects.all().count() == (begin -1))
+        self.failUnless(len(connection.queries) == 1)
+        
+
     def test_queryset_laziness(self):
         """This test exists to model the laziness of our queries;  the
         QuerySet cache should not alter the laziness of QuerySets."""

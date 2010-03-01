@@ -42,7 +42,12 @@ class LocalStoreTest(TestCase):
 
     def test_thread_locality(self):
         from Queue import Queue
-        from threading import Thread, current_thread
+        try:
+            from threading import Thread, current_thread
+        except:
+            #python 2.5 difference
+            from threading import Thread
+            from threading import currentThread as current_thread
         from time import sleep
         store = localstore.LocalStore()
         store['name'] = "Hi"
@@ -50,7 +55,11 @@ class LocalStoreTest(TestCase):
         def do_test():
             sleep(0.1)
             t = current_thread()
-            name = t.name
+            try:
+                name = t.name
+            except AttributeError:
+                #python 2.5 difference
+                name = t.getName()
             store[name] = 1
             store['name'] = name
             q.put(dict(store))
