@@ -173,7 +173,6 @@ class QueryCacheBackend(object):
         from django.db.models.sql.constants import MULTI
         from django.db.models.sql.datastructures import EmptyResultSet
 
-        # TODO: i think this parameter list might be a no-no in 2.5
         @wraps(original)
         def newfun(cls, *args, **kwargs):
             if args:
@@ -192,7 +191,7 @@ class QueryCacheBackend(object):
                 if result_type == MULTI:
                     return query.empty_iter()
             db = getattr(cls, 'using', 'default')
-            gen_key = self.keyhandler.get_generation(*cls.query.tables, db=db)
+            gen_key = self.keyhandler.get_generation(*cls.query.tables, **{'db':db})
             key = self.keyhandler.sql_key(gen_key, sql, params, cls.get_ordering(), result_type, db)
             val = self.cache_backend.get(key, None, db)
 
