@@ -43,8 +43,10 @@ class LocalStore(threading.local):
         expr = re.compile(fnmatch.translate(pat))
         m = {}
         for key in self.keys():
-            if expr.match(key):
-                m[key] = self[key]
+            #make sure the key is a str first
+            if type(key) in (str, unicode):
+                if expr.match(key):
+                    m[key] = self[key]
         return m
 
     def clear(self, pat=None):
@@ -54,8 +56,10 @@ class LocalStore(threading.local):
             return self.__dict__.clear()
         expr = re.compile(fnmatch.translate(pat))
         for key in self.keys():
-            if expr.match(key):
-                del self.__dict__[key]
+            #make sure the key is a str first
+            if type(key) in (str, unicode):
+                if expr.match(key):
+                    del self.__dict__[key]
 
     def __repr__(self): return repr(self.__dict__)
     def __str__(self): return str(self.__dict__)
