@@ -169,18 +169,14 @@ class QueryCacheBackend(object):
         self._patched = getattr(self, '_patched', False)
 
     def _monkey_select(self, original):
-        from django.db.models.sql import query
+        from django.db.models.sql import compiler
         from django.db.models.sql.constants import MULTI
         from django.db.models.sql.datastructures import EmptyResultSet
 
         @wraps(original)
         def newfun(cls, *args, **kwargs):
-            if args:
-                result_type = args[0]
-            else:
-                result_type = kwargs.get('result_type', MULTI)
+            result_type = args[0] if args else kwargs.get('result_type', MULTI)
 
-            from django.db.models.sql import compiler
             if type(cls) in (compiler.SQLInsertCompiler, compiler.SQLDeleteCompiler, compiler.SQLUpdateCompiler):
                 return original(cls, *args, **kwargs)
             try:
@@ -188,8 +184,10 @@ class QueryCacheBackend(object):
                 if not sql:
                     raise EmptyResultSet
             except EmptyResultSet:
+                from ipdb import set_trace; set_trace()
                 if result_type == MULTI:
-                    return query.empty_iter()
+                    # this was moved in 1.2 to compiler
+                    return compiler.empty_iter()
             db = getattr(cls, 'using', 'default')
             gen_key = self.keyhandler.get_generation(*cls.query.tables, **{'db':db})
             key = self.keyhandler.sql_key(gen_key, sql, params, cls.get_ordering(), result_type, db)
