@@ -184,7 +184,6 @@ class QueryCacheBackend(object):
                 if not sql:
                     raise EmptyResultSet
             except EmptyResultSet:
-                from ipdb import set_trace; set_trace()
                 if result_type == MULTI:
                     # this was moved in 1.2 to compiler
                     return compiler.empty_iter()
