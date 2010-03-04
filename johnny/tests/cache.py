@@ -38,6 +38,24 @@ class TransactionQueryCacheBase(base.TransactionJohnnyTestCase):
         _post_teardown(self)
         super(TransactionQueryCacheBase, self)._post_teardown()
 
+class message_queue(object):
+    """Return a message queue that gets 'hit' or 'miss' messages.  The signal
+    handlers use weakrefs, so if we don't save references to this object they
+    will get gc'd pretty fast."""
+    def __init__(self):
+        from johnny.signals import qc_hit, qc_miss
+        from Queue import Queue as queue
+        self.q = queue()
+        qc_hit.connect(self._hit)
+        qc_miss.connect(self._miss)
+
+    def _hit(self, *a, **k): self.q.put(True)
+    def _miss(self, *a, **k): self.q.put(False)
+
+    def get(self): return self.q.get()
+    def get_nowait(self): return self.q.get_nowait()
+    def qsize(self): return self.q.qsize()
+    def empty(self): return self.q.empty()
 
 class MultiDbTest(TransactionQueryCacheBase):
     multi_db = True
@@ -68,8 +86,8 @@ class MultiDbTest(TransactionQueryCacheBase):
     def test_basic_queries(self):
         """Tests basic queries and that the cache is working for multiple db's"""
         if len(getattr(settings, "DATABASES", [])) <= 1:
-            print "Skipping multi databases"
-            return 
+            print "\n  Skipping multi databases"
+            return
 
         from testapp.models import Genre, Book, Publisher, Person
         from django.db import connections
@@ -101,8 +119,8 @@ class MultiDbTest(TransactionQueryCacheBase):
         """Tests transaction rollbacks and local cache for multiple dbs"""
 
         if len(getattr(settings, "DATABASES", [])) <= 1:
-            print "Skipping multi databases"
-            return 
+            print "\n  Skipping multi databases"
+            return
         from Queue import Queue as queue
         q = queue()
         other = lambda x: self._run_threaded(x, q)
@@ -169,8 +187,8 @@ class MultiDbTest(TransactionQueryCacheBase):
     def test_savepoints(self):
         """tests savepoints for multiple db's"""
         if len(getattr(settings, "DATABASES", [])) <= 1:
-            print "Skipping multi databases"
-            return 
+            print "\n  Skipping multi databases"
+            return
 
         from Queue import Queue as queue
         q = queue()
@@ -206,7 +224,6 @@ class MultiDbTest(TransactionQueryCacheBase):
         hit, ostart = q.get()
         self.failUnless(hit)
         self.failUnless(ostart.title == start_g1)
-        
         #should not be a hit due to rollback
         connections["default"].queries = []
         transaction.savepoint_rollback(sid, using="default")
@@ -248,7 +265,7 @@ class MultiDbTest(TransactionQueryCacheBase):
         transaction.leave_transaction_management("default")
         transaction.leave_transaction_management("second")
 
-        
+
 class SingleModelTest(QueryCacheBase):
     fixtures = base.johnny_fixtures
 
@@ -289,14 +306,21 @@ class SingleModelTest(QueryCacheBase):
         g1 = Genre.objects.get(pk=1)
         begin = Genre.objects.all().count()
         g1.delete()
-        try:
-            self.assertRaises(Genre.objects.get(pk=1), Genre.DoesNotExist)
-        except Genre.DoesNotExist:
-            pass
+        self.assertRaises(Genre.DoesNotExist, lambda: Genre.objects.get(pk=1))
         connection.queries = []
         self.failUnless(Genre.objects.all().count() == (begin -1))
         self.failUnless(len(connection.queries) == 1)
-        
+        Genre(title='Science Fiction', slug='scifi').save()
+        Genre(title='Fantasy', slug='rubbish').save()
+        Genre(title='Science Fact', slug='scifact').save()
+        count = Genre.objects.count()
+        Genre.objects.get(title='Fantasy')
+        q = message_queue()
+        Genre.objects.filter(title__startswith='Science').delete()
+        # this should not be cached
+        Genre.objects.get(title='Fantasy')
+        self.failUnless(not q.get_nowait())
+
 
     def test_queryset_laziness(self):
         """This test exists to model the laziness of our queries;  the
@@ -378,19 +402,11 @@ class MultiModelTest(QueryCacheBase):
         from Queue import Queue as queue
         from testapp.models import Book, Genre, Publisher
         from johnny.cache import invalidate
-        from johnny.signals import qc_hit, qc_miss
-        q = queue()
-        def hit(*args, **kwargs):
-            q.put(True)
-        def miss(*args, **kwargs):
-            q.put(False)
-        qc_hit.connect(hit)
-        qc_miss.connect(miss)
-
+        q = message_queue()
         b = Book.objects.get(id=1)
         invalidate(Book)
         b = Book.objects.get(id=1)
-        first, second = q.get(), q.get()
+        first, second = q.get_nowait(), q.get_nowait()
         self.failUnless(first == second == False)
         g = Genre.objects.get(id=1)
         p = Publisher.objects.get(id=1)

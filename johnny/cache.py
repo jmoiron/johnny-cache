@@ -14,7 +14,7 @@ try:
 except ImportError:
     from md5 import md5
 
-from django.conf import settings 
+from django.conf import settings
 import localstore
 import signals
 from transaction import TransactionManager
@@ -271,6 +271,7 @@ class QueryCacheBackend(object):
         from django.db.models import signals
         signals.post_save.connect(self.invalidate, sender=None)
         signals.post_delete.connect(self.invalidate, sender=None)
+        # FIXME: only needed in 1.1?
         import signals as johnny_signals
         johnny_signals.qc_m2m_change.connect(self.invalidate_m2m, sender=None)
 

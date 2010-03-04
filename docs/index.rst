@@ -23,8 +23,12 @@ You can fork johnny-cache `from its hg repository
 
     hg clone http://dev.jmoiron.net/hg/johnny-cache
 
+You can contact the authors at `@jmoiron`_ and `@finder83`_.
+
 .. _django: http://djangoproject.com
 .. _memcached: http://memcached.org
+.. _@jmoiron: http://twitter.com/jmoiron
+.. _@finder83: http://twitter.com/finder83
 
 Usage
 =====
