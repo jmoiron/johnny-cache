@@ -304,6 +304,9 @@ class SingleModelTest(QueryCacheBase):
         new_count = Publisher.objects.count()
         self.failUnless(len(connection.queries) == 1)
         self.failUnless(new_count == 2)
+        # this tests the codepath after 'except EmptyResultSet' where
+        # result_type == MULTI
+        list(Publisher.objects.filter(title__in=[]))
 
     def test_querycache_return_results(self):
         """Test that the return results from the query cache are what we

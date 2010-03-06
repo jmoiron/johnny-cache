@@ -1,7 +1,7 @@
 syntax: glob
 
 tags
-django
+django*
 local_settings.py
 *.pyc
 *.swp
