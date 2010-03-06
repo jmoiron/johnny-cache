@@ -137,6 +137,7 @@ The following settings are available for the QuerySet Cache:
 * ``DISABLE_QUERYSET_CACHE``
 * ``JOHNNY_MIDDLEWARE_KEY_PREFIX``
 * ``JOHNNY_MIDDLEWARE_SECONDS``
+* ``MAN_IN_BLACKLIST``
 
 ``DISABLE_QUERYSET_CACHE`` will disable the QuerySet cache even if the
 middleware is installed.  This is mostly to make it easy for other modules
@@ -155,6 +156,11 @@ the design goal of Johnny was to be able to maintain a consistent cache at
 all times, the default behavior is to cache everything *forever*.  Note that
 if you are not using one of Johnny's `custom backends <backends.html>`_, the 
 default value of ``0`` will work differently on different backends.
+
+``MAN_IN_BLACKLIST`` is a user defined tuple that contains table names to
+exclude from the QuerySet Cache.  If you have no sense of humor, or want your
+settings file to be understandable, you can use the alias
+``JOHNNY_TABLE_BLACKLIST``.  We just couldn't resist.
 
 Signals
 ~~~~~~~
