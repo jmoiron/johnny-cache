@@ -20,6 +20,18 @@ import signals
 from transaction import TransactionManager
 
 local = localstore.LocalStore()
+blacklist = getattr(settings, 'MAN_IN_BLACKLIST',
+            getattr(settings, 'JOHNNY_TABLE_BLACKLIST', []))
+blacklist = set(blacklist)
+
+def blacklist_match(*tables):
+    """Returns True if a set of tables is in the blacklist, False otherwise."""
+    # XXX: When using a blacklist, this has to be done EVERY query;
+    # It'd be nice to make this as fast as possible.  In general, queries
+    # should have relatively few tables involved, and I don't imagine that
+    # blacklists would grow very vast.  The fastest i've been able to come
+    # up with is to pre-create a blacklist set and use intersect.
+    return bool(blacklist.intersection(tables))
 
 def get_backend():
     """Get's a QueryCacheBackend class for the current version of django."""
