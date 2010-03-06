@@ -199,10 +199,15 @@ class QueryCacheBackend(object):
                 if result_type == MULTI:
                     # this was moved in 1.2 to compiler
                     return compiler.empty_iter()
+
             db = getattr(cls, 'using', 'default')
-            gen_key = self.keyhandler.get_generation(*cls.query.tables, **{'db':db})
-            key = self.keyhandler.sql_key(gen_key, sql, params, cls.get_ordering(), result_type, db)
-            val = self.cache_backend.get(key, None, db)
+            key, val = None, None
+            # check the blacklist for any of the involved tables;  if it's not
+            # there, then look for the value in the cache.
+            if not blacklist_match(*cls.query.tables):
+                gen_key = self.keyhandler.get_generation(*cls.query.tables, **{'db':db})
+                key = self.keyhandler.sql_key(gen_key, sql, params, cls.get_ordering(), result_type, db)
+                val = self.cache_backend.get(key, None, db)
 
             if val is not None:
                 signals.qc_hit.send(sender=cls, tables=cls.query.tables,
@@ -222,7 +227,7 @@ class QueryCacheBackend(object):
                 #no longer lazy...
                 #todo - create a smart iterable wrapper
                 val = list(val)
-            self.cache_backend.set(key, val, 0, db)
+            if key is not None: self.cache_backend.set(key, val, 0, db)
             return val
         return newfun
 
@@ -311,8 +316,10 @@ class QueryCacheBackend11(QueryCacheBackend):
                 if result_type == MULTI:
                     return query.empty_iter()
 
-            # get the cache key for the current generation + this query set
-            if cls.tables: # on INSERT statements, this isn't set...
+            val, key = None, None
+            # check the blacklist for any of the involved tables;  if it's not
+            # there, then look for the value in the cache.
+            if cls.tables and not blacklist_match(*cls.tables):
                 gen_key = self.keyhandler.get_generation(*cls.tables)
                 key = self.keyhandler.sql_key(gen_key, sql, params,
                         cls.ordering_aliases, result_type)
@@ -323,16 +330,20 @@ class QueryCacheBackend11(QueryCacheBackend):
                             query=(sql, params, cls.ordering_aliases),
                             size=len(val), key=key)
                     return val
-                signals.qc_miss.send(sender=cls, tables=cls.tables,
-                        query=(sql, params, cls.ordering_aliases),
-                        key=key)
 
             # we didn't find the value in the cache, so execute the query
             result = original(cls, result_type)
             if cls.tables and not sql.startswith('UPDATE') and not sql.startswith('DELETE'):
+                # I think we should always be sending a signal here if we miss..
+                signals.qc_miss.send(sender=cls, tables=cls.tables,
+                        query=(sql, params, cls.ordering_aliases),
+                        key=key)
                 if hasattr(result, '__iter__'):
                     result = list(result)
-                self.cache_backend.set(key, result)
+                # 'key' will be None here if any of these tables were
+                # blacklisted, in which case we just don't care.
+                if key is not None:
+                    self.cache_backend.set(key, result)
             return result
         return newfun
 

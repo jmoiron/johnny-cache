@@ -9,7 +9,7 @@ from johnny import middleware
 import base
 
 # put tests in here to be included in the testing suite
-__all__ = ['MultiDbTest', 'SingleModelTest', 'MultiModelTest', 'TransactionSupportTest']
+__all__ = ['MultiDbTest', 'SingleModelTest', 'MultiModelTest', 'TransactionSupportTest', 'BlackListTest']
 
 def _pre_setup(self):
     self.saved_DISABLE_SETTING = getattr(settings, 'DISABLE_QUERYSET_CACHE', False)
@@ -56,6 +56,25 @@ class message_queue(object):
     def get_nowait(self): return self.q.get_nowait()
     def qsize(self): return self.q.qsize()
     def empty(self): return self.q.empty()
+
+class BlackListTest(QueryCacheBase):
+    fixtures = base.johnny_fixtures
+
+    def test_basic_blacklist(self):
+        from johnny import cache
+        from testapp.models import Genre, Book
+        q = message_queue()
+        old = cache.blacklist
+        cache.blacklist = set(['testapp_genre'])
+        connection.queries = []
+        Book.objects.get(id=1)
+        Book.objects.get(id=1)
+        self.failUnless((False, True) == (q.get_nowait(), q.get_nowait()))
+        list(Genre.objects.all())
+        list(Genre.objects.all())
+        self.failUnless(not any((q.get_nowait(), q.get_nowait())))
+        cache.blacklist = old
+
 
 class MultiDbTest(TransactionQueryCacheBase):
     multi_db = True
