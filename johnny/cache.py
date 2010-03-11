@@ -199,6 +199,8 @@ class QueryCacheBackend(object):
                 if result_type == MULTI:
                     # this was moved in 1.2 to compiler
                     return compiler.empty_iter()
+                else:
+                    return
 
             db = getattr(cls, 'using', 'default')
             key, val = None, None
@@ -315,6 +317,8 @@ class QueryCacheBackend11(QueryCacheBackend):
             except EmptyResultSet:
                 if result_type == MULTI:
                     return query.empty_iter()
+                else:
+                    return
 
             val, key = None, None
             # check the blacklist for any of the involved tables;  if it's not

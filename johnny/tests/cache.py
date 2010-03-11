@@ -343,6 +343,12 @@ class SingleModelTest(QueryCacheBase):
         Genre.objects.get(title='Fantasy')
         self.failUnless(not q.get_nowait())
 
+    def test_empty_count(self):
+        """Test for an empty count aggregate query with an IN"""
+        from testapp.models import Genre
+        books = Genre.objects.filter(id__in=[])
+        count = books.count()
+        self.failUnless(count == 0)
 
     def test_queryset_laziness(self):
         """This test exists to model the laziness of our queries;  the
