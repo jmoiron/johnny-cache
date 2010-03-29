@@ -306,7 +306,7 @@ class SingleModelTest(QueryCacheBase):
         self.failUnless(new_count == 2)
         # this tests the codepath after 'except EmptyResultSet' where
         # result_type == MULTI
-        list(Publisher.objects.filter(title__in=[]))
+        self.failUnless(not list(Publisher.objects.filter(title__in=[])))
 
     def test_querycache_return_results(self):
         """Test that the return results from the query cache are what we
@@ -342,6 +342,16 @@ class SingleModelTest(QueryCacheBase):
         # this should not be cached
         Genre.objects.get(title='Fantasy')
         self.failUnless(not q.get_nowait())
+
+    def test_update(self):
+        from testapp.models import Genre
+        connection.queries = []
+        g1 = Genre.objects.get(pk=1)
+        Genre.objects.all().update(title="foo")
+        g2 = Genre.objects.get(pk=1)
+        self.failUnless(g1.title != g2.title)
+        self.failUnless(g2.title == "foo")
+        self.failUnless(len(connection.queries) == 3)
 
     def test_empty_count(self):
         """Test for an empty count aggregate query with an IN"""

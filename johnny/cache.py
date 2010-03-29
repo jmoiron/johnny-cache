@@ -190,6 +190,12 @@ class QueryCacheBackend(object):
             result_type = args[0] if args else kwargs.get('result_type', MULTI)
 
             if type(cls) in (compiler.SQLInsertCompiler, compiler.SQLDeleteCompiler, compiler.SQLUpdateCompiler):
+                if type(cls) == compiler.SQLUpdateCompiler:
+                    # XXX: is there a way to check if we've actually performed an update here?
+                    ret = original(cls, *args, **kwargs)
+                    for table in cls.query.tables:
+                        self.keyhandler.invalidate_table(table, getattr(cls, 'using', 'default'))
+                    return ret
                 return original(cls, *args, **kwargs)
             try:
                 sql, params = cls.as_sql()
@@ -348,6 +354,10 @@ class QueryCacheBackend11(QueryCacheBackend):
                 # blacklisted, in which case we just don't care.
                 if key is not None:
                     self.cache_backend.set(key, result)
+            elif cls.tables and sql.startswith('UPDATE'):
+                # issue #1 in bitbucket, not invalidating on update
+                for table in cls.tables:
+                    self.keyhandler.invalidate_table(table)
             return result
         return newfun
 
