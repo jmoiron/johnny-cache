@@ -190,12 +190,6 @@ class QueryCacheBackend(object):
             result_type = args[0] if args else kwargs.get('result_type', MULTI)
 
             if type(cls) in (compiler.SQLInsertCompiler, compiler.SQLDeleteCompiler, compiler.SQLUpdateCompiler):
-                if type(cls) == compiler.SQLUpdateCompiler:
-                    # XXX: is there a way to check if we've actually performed an update here?
-                    ret = original(cls, *args, **kwargs)
-                    for table in cls.query.tables:
-                        self.keyhandler.invalidate_table(table, getattr(cls, 'using', 'default'))
-                    return ret
                 return original(cls, *args, **kwargs)
             try:
                 sql, params = cls.as_sql()
@@ -244,6 +238,10 @@ class QueryCacheBackend(object):
         def newfun(cls, *args, **kwargs):
             db = getattr(cls, 'using', 'default')
             from django.db.models.sql import compiler
+            # we have to do this before we check the tables, since the tables
+            # are actually being set in the original function
+            ret = original(cls, *args, **kwargs)
+
             if type(cls) == compiler.SQLInsertCompiler:
                 #Inserts are a special case where cls.tables
                 #are not populated.
@@ -252,7 +250,7 @@ class QueryCacheBackend(object):
                 tables = cls.query.tables
             for table in tables:
                 self.keyhandler.invalidate_table(table, db)
-            return original(cls, *args, **kwargs)
+            return ret
         return newfun
 
 
