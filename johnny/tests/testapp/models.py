@@ -182,7 +182,7 @@ class Milk(models.Model):
     """A meaningless model designed to test unicode ability.  This might screw
     up databases that can't handle unicode table/column names."""
     name = models.CharField(blank=True, max_length=20, db_column=u'名前')
-    chocolate = models.BooleanField(blank=True, db_column=u'ちょっコレット')
+    chocolate = models.BooleanField(blank=True, db_column=u'チョコレート')
 
     class Meta:
         db_table = u'ミルク'
