@@ -9,13 +9,13 @@ You can install johnny with pip::
 
 
 You can fork johnny-cache `from its hg repository 
-<http://dev.jmoiron.net/hg/johnny-cache>`_::
+<http://bitbucket.org/jmoiron/johnny-cache>`_::
 
-    hg clone http://dev.jmoiron.net/hg/johnny-cache
+    hg clone http://bitbucket.org/jmoiron/johnny-cache
 
 
 Please read `The full documentation to Johnny Cache
-<http://dev.jmoiron.net/johnny/>`_ before using it as there are a few
+<http://packages.python.org/johnny-cache/>`_ before using it as there are a few
 edge cases where automatic invalidation was not possible.
 
 .. _django: http://djangoproject.com

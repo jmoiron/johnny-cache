@@ -19,11 +19,14 @@ You can install johnny with pip::
 
 
 You can fork johnny-cache `from its hg repository 
-<http://dev.jmoiron.net/hg/johnny-cache>`_::
+<http://bitbucket.org/jmoiron/johnny-cache>`_::
 
-    hg clone http://dev.jmoiron.net/hg/johnny-cache
+    hg clone http://bitbucket.org/jmoiron/johnny-cache
 
-You can contact the authors at `@jmoiron`_ and `@finder83`_.
+
+Please use `bitbucket's issue tracker
+<http://bitbucket.org/jmoiron/johnny-cache/issues/>`_ to report bugs. Contact 
+the authors at `@jmoiron`_ and `@finder83`_.
 
 .. _django: http://djangoproject.com
 .. _memcached: http://memcached.org

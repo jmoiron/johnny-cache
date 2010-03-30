@@ -1,0 +1,12 @@
+0.2   -- 03/30/2010
+    * blacklist support (MAN_IN_BLACKLIST)
+    * fix to allow unicode table & column names (lauritzen)
+    * fix bulk updates to correctly invalidate cache
+
+0.1.1 -- 03/01/2010
+    * python2.5 compatibility changes @schinckel
+    * fix bug on DELETE codepath @schinckel
+    * fixes for empty iters in return result
+
+0.1   -- 02/28/2010
+    * initial checkin, base features
