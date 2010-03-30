@@ -70,8 +70,8 @@ class KeyGen(object):
     def gen_table_key(self, table, db='default'):
         """Returns a key that is standard for a given table name and database alias.
         Total length up to 212 (max for memcache is 250)."""
-        table = str(table)
-        db = str(db)
+        table = unicode(table)
+        db = unicode(db)
         if len(table) > 100:
             table = table[0:68] + self.gen_key(table[68:])
         if db and len(db) > 100:
@@ -86,9 +86,10 @@ class KeyGen(object):
 
     def gen_key(self, *values):
         """Generate a key from one or more values."""
+        convert = lambda x: x.encode("utf-8") if isinstance(x, unicode) else str(x)
         key = md5()
         for v in values:
-            key.update(str(v))
+            key.update(convert(v))
         return key.hexdigest()
 
 class KeyHandler(object):

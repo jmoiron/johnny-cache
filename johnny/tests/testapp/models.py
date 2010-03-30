@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""Test models for Johnny-Cache"""
+
 from django.db import models
 from django.db.models import permalink
 from django.conf import settings
@@ -172,3 +177,13 @@ class Page(models.Model):
 
     def __unicode__(self):
         return '%s' % self.current_page
+
+class Milk(models.Model):
+    """A meaningless model designed to test unicode ability.  This might screw
+    up databases that can't handle unicode table/column names."""
+    name = models.CharField(blank=True, max_length=20, db_column=u'名前')
+    chocolate = models.BooleanField(blank=True, db_column=u'ちょっコレット')
+
+    class Meta:
+        db_table = u'ミルク'
+
