@@ -1,4 +1,4 @@
-0.2   -- 03/30/2010
+0.2   -- 03/31/2010
     * blacklist support (MAN_IN_BLACKLIST)
     * fix to allow unicode table & column names (lauritzen)
     * fix bulk updates to correctly invalidate cache
