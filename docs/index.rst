@@ -79,6 +79,13 @@ With these settings, all of your ORM queries are now cached.  You should
 read the `queryset cache documentation <queryset_cache.html>`_ closely to
 see if you are doing anything that might require manual invalidation.
 
+New in this version
+~~~~~~~~~~~~~~~~~~~
+
+* `blacklist support <queryset_cache.html#settings>`_ (``MAN_IN_BLACKLIST``)
+* fix to allow unicode table & column names
+* fix bulk updates to correctly invalidate cache
+
 In Depth Documentation
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -88,37 +95,6 @@ In Depth Documentation
    queryset_cache
    localstore_cache
    backends
-
-.. Feature Overview
-.. ================
-
-.. QuerySet Caching
-.. ~~~~~~~~~~~~~~~~
-
-.. QuerySet caching is the automatic caching of all database reads.  Conceptually, 
-.. it works very similar to the built-in write-invalidate queryset caching that 
-.. is present in your RDBMS.  
-
-.. When a read (``SELECT``) is made from one or more tables, that read is cached. 
-.. When a write (``INSERT``, ``UPDATE``, etc) is made against that table, the 
-.. read cache built up for that table is invalidated.  This type of caching can be 
-.. very beneficial when an app is very read heavy and write light, or when writing 
-.. is confined to a few tables, but generaly helps pull lots of read traffic off
-.. of the database servers.
-
-.. The QuerySet Cache supports Django versions 1.1 and 1.2.
-
-.. LocalStore Cache
-.. ~~~~~~~~~~~~~~~~
-
-.. Johnny provides a cache called the *LocalStore* Cache.  It is a
-.. thread-local dict-like object that is cleared at the end of each request by
-.. an associated middleware.  This can be useful for global data that must be
-.. kept, referred to, or even modified throughout the lifetime of a request,
-.. like messaging, media registration, or cached datasets.
-
-.. Indices and tables
-.. ==================
 
 .. * :ref:`modindex`
 .. * :ref:`genindex`
