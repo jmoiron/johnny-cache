@@ -19,11 +19,13 @@ import sys
 
 class CacheClass(locmem.CacheClass):
     def add(self, key, value, timeout=None):
-        timeout = sys.maxint if timeout is 0 else timeout
+        if timeout is 0:
+            timeout = sys.maxint
         return super(CacheClass, self).add(smart_str(key), value, timeout)
 
     def set(self, key, value, timeout=None):
-        timeout = sys.maxint if timeout is 0 else timeout
+        if timeout is 0:
+            timeout = sys.maxint
         return super(CacheClass, self).set(smart_str(key), value, timeout)
 
 

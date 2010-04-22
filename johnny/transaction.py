@@ -44,7 +44,8 @@ class TransactionManager(object):
             self.local['trans_sids'] = {}
         d = self.local['trans_sids']
         if self.is12():
-            using = DEFAULT_DB_ALIAS if using == None else using
+            if using is None:
+                using = DEFAULT_DB_ALIAS
         else:
             using = 'default'
         if using not in d:
@@ -53,7 +54,8 @@ class TransactionManager(object):
 
     def _clear_sid_stack(self, using=None):
         if self.is12():
-            using = DEFAULT_DB_ALIAS if using == None else using
+            if using is None:
+                using = DEFAULT_DB_ALIAS
         else:
             using = 'default'
         if using in self.local.get('trans_sids', {}):
@@ -86,7 +88,8 @@ class TransactionManager(object):
 
     def _trunc_using(self, using):
         if self.is12():
-            using = DEFAULT_DB_ALIAS if not using else using
+            if using is None:
+                using = DEFAULT_DB_ALIAS
         else:
             using = 'default'
         if len(using) > 100:

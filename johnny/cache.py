@@ -48,7 +48,10 @@ def invalidate(*tables, **kwargs):
     kwarg 'using' to set the database."""
     backend = get_backend()()
     db = kwargs.get('using', 'default')
-    resolve = lambda x: x if isinstance(x, basestring) else x._meta.db_table
+    def resolve(x):
+        if isinstance(x, basestring):
+            return x
+        return x._meta.db_table
     if backend._patched:
         for t in map(resolve, tables):
             backend.keyhandler.invalidate_table(t, db)
@@ -86,7 +89,10 @@ class KeyGen(object):
 
     def gen_key(self, *values):
         """Generate a key from one or more values."""
-        convert = lambda x: x.encode("utf-8") if isinstance(x, unicode) else str(x)
+        def convert(x):
+            if isinstance(x, unicode):
+                return x.encode('utf-8')
+            return str(x)
         key = md5()
         for v in values:
             key.update(convert(v))
@@ -188,7 +194,10 @@ class QueryCacheBackend(object):
 
         @wraps(original)
         def newfun(cls, *args, **kwargs):
-            result_type = args[0] if args else kwargs.get('result_type', MULTI)
+            if args:
+                result_type = args[0]
+            else:
+                result_type = kwargs.get('result_type', MULTI)
 
             if type(cls) in (compiler.SQLInsertCompiler, compiler.SQLDeleteCompiler, compiler.SQLUpdateCompiler):
                 return original(cls, *args, **kwargs)
