@@ -38,7 +38,7 @@ def get_backend():
     import django
     if django.VERSION[:2] == (1, 1):
         return QueryCacheBackend11
-    if django.VERSION[:2] == (1, 2):
+    if django.VERSION[:2] in ((1, 2), (1, 3)):
         return QueryCacheBackend
     raise ImproperlyConfigured("QueryCacheMiddleware cannot patch your version of django.")
 

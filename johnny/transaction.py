@@ -43,7 +43,7 @@ class TransactionManager(object):
         if 'trans_sids' not in self.local:
             self.local['trans_sids'] = {}
         d = self.local['trans_sids']
-        if self.is12():
+        if self.has_multi_db():
             if using is None:
                 using = DEFAULT_DB_ALIAS
         else:
@@ -53,7 +53,7 @@ class TransactionManager(object):
         return d[using]
 
     def _clear_sid_stack(self, using=None):
-        if self.is12():
+        if self.has_multi_db():
             if using is None:
                 using = DEFAULT_DB_ALIAS
         else:
@@ -61,10 +61,11 @@ class TransactionManager(object):
         if using in self.local.get('trans_sids', {}):
             del self.local['trans_sids']
 
-    def is12(self):
-        if django.VERSION[:2] == (1, 2):
+    def has_multi_db(self):
+        if django.VERSION[:2] in ((1, 2), (1, 3)):
             return True
         return False
+
     def is_managed(self):
         return django_transaction.is_managed()
 
@@ -87,7 +88,7 @@ class TransactionManager(object):
                 return self.local[sid][key]
 
     def _trunc_using(self, using):
-        if self.is12():
+        if self.has_multi_db():
             if using is None:
                 using = DEFAULT_DB_ALIAS
         else:
@@ -111,7 +112,7 @@ class TransactionManager(object):
             self.cache_backend.set(key, val, timeout)
 
     def _clear(self, using=None):
-        if self.is12():
+        if self.has_multi_db():
             self.local.clear('%s_%s_*'%(self.prefix, self._trunc_using(using)))
         else:
             self.local.clear('%s_*'%self.prefix)
@@ -124,7 +125,7 @@ class TransactionManager(object):
             # XXX: multi-set? 
             if self._uses_savepoints():
                 self._commit_all_savepoints(using)
-            if self.is12():
+            if self.has_multi_db():
                 c = self.local.mget('%s_%s_*'%(self.prefix, self._trunc_using(using)))
             else:
                 c = self.local.mget('%s_*'%self.prefix)
@@ -148,9 +149,11 @@ class TransactionManager(object):
             #1.1 version
             original()
             self._flush(commit=commit)
-        if django.VERSION[:2] == (1,1): return newfun11
-        if django.VERSION[:2] == (1,2): return newfun
-
+        if django.VERSION[:2] == (1,1):
+            return newfun11
+        elif django.VERSION[:2] in ((1,2), (1,3)):
+            return newfun
+        return original
     def _uses_savepoints(self):
         return connection.features.uses_savepoints
 
@@ -163,7 +166,7 @@ class TransactionManager(object):
         key = self._sid_key(sid, using)
 
         #get all local dirty items
-        if self.is12():
+        if self.has_multi_db():
             c = self.local.mget('%s_%s_*'%(self.prefix, self._trunc_using(using)))
         else:
             c = self.local.mget('%s_*'%self.prefix)
@@ -229,7 +232,7 @@ class TransactionManager(object):
             self._rollback_savepoint(sids[0], using)
 
     def _store_dirty(self, using=None):
-        if self.is12():
+        if self.has_multi_db():
             c = self.local.mget('%s_%s_*'%(self.prefix, self._trunc_using(using)))
         else:
             c = self.local.mget('%s_*'%self.prefix)
