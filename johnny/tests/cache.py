@@ -8,6 +8,14 @@ from django.db import connection
 from johnny import middleware
 import base
 
+try:
+    any
+except NameError:
+    def any(iterable):
+        for i in iterable:
+            if i: return True
+        return False
+
 # put tests in here to be included in the testing suite
 __all__ = ['MultiDbTest', 'SingleModelTest', 'MultiModelTest', 'TransactionSupportTest', 'BlackListTest']
 

@@ -19,6 +19,14 @@ import localstore
 import signals
 from transaction import TransactionManager
 
+try:
+    any
+except NameError:
+    def any(iterable):
+        for i in iterable:
+            if i: return True
+        return False
+
 local = localstore.LocalStore()
 blacklist = getattr(settings, 'MAN_IN_BLACKLIST',
             getattr(settings, 'JOHNNY_TABLE_BLACKLIST', []))
