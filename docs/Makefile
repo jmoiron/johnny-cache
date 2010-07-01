@@ -96,3 +96,9 @@ distro: html
 	@echo "Pushing documents to http://dev.jmoiron.net/johnny/"
 	scp -r $(BUILDDIR)/html/* jmoiron@jmoiron.net:dev.jmoiron.net/johnny/
 
+zip: html
+	@echo
+	@echo "Making zip file 'johnny-cache.doc.zip'"
+	cd $(BUILDDIR)/html/; zip -r johnny-cache.doc.zip *
+	mv $(BUILDDIR)/html/johnny-cache.doc.zip .
+
