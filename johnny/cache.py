@@ -224,7 +224,7 @@ class QueryCacheBackend(object):
             key, val = None, None
             # check the blacklist for any of the involved tables;  if it's not
             # there, then look for the value in the cache.
-            if not blacklist_match(*cls.query.tables):
+            if cls.query.tables and not blacklist_match(*cls.query.tables):
                 gen_key = self.keyhandler.get_generation(*cls.query.tables, **{'db':db})
                 key = self.keyhandler.sql_key(gen_key, sql, params, cls.get_ordering(), result_type, db)
                 val = self.cache_backend.get(key, None, db)

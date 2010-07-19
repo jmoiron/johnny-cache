@@ -368,6 +368,14 @@ class SingleModelTest(QueryCacheBase):
         count = books.count()
         self.failUnless(count == 0)
 
+    def test_aggregate_annotation(self):
+        """Test aggregating an annotation """
+        from django.db.models import Count
+        from django.db.models import Sum
+        from testapp.models import Book
+        author_count = Book.objects.annotate(author_count=Count('authors')).aggregate(Sum('author_count'))
+        self.assertEquals(author_count['author_count__sum'],2)
+
     def test_queryset_laziness(self):
         """This test exists to model the laziness of our queries;  the
         QuerySet cache should not alter the laziness of QuerySets."""
