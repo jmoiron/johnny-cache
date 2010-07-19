@@ -46,32 +46,13 @@ class TransactionQueryCacheBase(base.TransactionJohnnyTestCase):
         _post_teardown(self)
         super(TransactionQueryCacheBase, self)._post_teardown()
 
-class message_queue(object):
-    """Return a message queue that gets 'hit' or 'miss' messages.  The signal
-    handlers use weakrefs, so if we don't save references to this object they
-    will get gc'd pretty fast."""
-    def __init__(self):
-        from johnny.signals import qc_hit, qc_miss
-        from Queue import Queue as queue
-        self.q = queue()
-        qc_hit.connect(self._hit)
-        qc_miss.connect(self._miss)
-
-    def _hit(self, *a, **k): self.q.put(True)
-    def _miss(self, *a, **k): self.q.put(False)
-
-    def get(self): return self.q.get()
-    def get_nowait(self): return self.q.get_nowait()
-    def qsize(self): return self.q.qsize()
-    def empty(self): return self.q.empty()
-
 class BlackListTest(QueryCacheBase):
     fixtures = base.johnny_fixtures
 
     def test_basic_blacklist(self):
         from johnny import cache
         from testapp.models import Genre, Book
-        q = message_queue()
+        q = base.message_queue()
         old = cache.blacklist
         cache.blacklist = set(['testapp_genre'])
         connection.queries = []
@@ -345,7 +326,7 @@ class SingleModelTest(QueryCacheBase):
         Genre(title='Science Fact', slug='scifact').save()
         count = Genre.objects.count()
         Genre.objects.get(title='Fantasy')
-        q = message_queue()
+        q = base.message_queue()
         Genre.objects.filter(title__startswith='Science').delete()
         # this should not be cached
         Genre.objects.get(title='Fantasy')
@@ -456,7 +437,7 @@ class MultiModelTest(QueryCacheBase):
         from Queue import Queue as queue
         from testapp.models import Book, Genre, Publisher
         from johnny.cache import invalidate
-        q = message_queue()
+        q = base.message_queue()
         b = Book.objects.get(id=1)
         invalidate(Book)
         b = Book.objects.get(id=1)
