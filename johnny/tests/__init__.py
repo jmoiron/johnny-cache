@@ -13,6 +13,7 @@ http://code.djangoproject.com/ticket/7835#comment:21
 # import the other tests from johnny
 from localstore import LocalStoreTest
 from cache import *
+from web import *
 
 from testapp.models import *
 
