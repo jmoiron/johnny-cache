@@ -354,8 +354,13 @@ class SingleModelTest(QueryCacheBase):
         from django.db.models import Count
         from django.db.models import Sum
         from testapp.models import Book
+        from django.core.paginator import Paginator
         author_count = Book.objects.annotate(author_count=Count('authors')).aggregate(Sum('author_count'))
         self.assertEquals(author_count['author_count__sum'],2)
+        # also test using the paginator, although this shouldn't be a big issue..
+        books = Book.objects.all().annotate(num_authors=Count('authors'))
+        paginator = Paginator(books, 25)
+        list_page = paginator.page(1)
 
     def test_queryset_laziness(self):
         """This test exists to model the laziness of our queries;  the
