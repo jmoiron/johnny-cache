@@ -51,17 +51,11 @@ class TransactionJohnnyWebTestCase(TransactionJohnnyTestCase):
     def _pre_setup(self):
         from johnny import middleware
         self.saved_MIDDLEWARE_CLASSES = settings.MIDDLEWARE_CLASSES
+        if getattr(self.__class__, 'middleware', None):
+            settings.MIDDLEWARE_CLASSES = self.__class__.middleware
         self.saved_DISABLE_SETTING = getattr(settings, 'DISABLE_QUERYSET_CACHE', False)
         settings.DISABLE_QUERYSET_CACHE = False
         self.middleware = middleware.QueryCacheMiddleware()
-        settings.MIDDLEWARE_CLASSES = (
-            'johnny.middleware.QueryCacheMiddleware',
-            'django.middleware.common.CommonMiddleware',
-            'django.contrib.sessions.middleware.SessionMiddleware',
-            'django.contrib.auth.middleware.AuthenticationMiddleware',
-            'johnny.middleware.LocalStoreClearMiddleware',
-            'django.middleware.transaction.TransactionMiddleware',
-        )
         self.saved_ROOT_URLCONF = settings.ROOT_URLCONF
         settings.ROOT_URLCONF = 'johnny.tests.testapp.urls'
         super(TransactionJohnnyWebTestCase, self)._pre_setup()
