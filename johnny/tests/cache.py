@@ -508,6 +508,34 @@ class MultiModelTest(QueryCacheBase):
         p1.books.clear()
         self.failUnless(b.authors.all().count() == 0)
 
+    def test_subselect_support(self):
+        """Test that subselects are handled properly."""
+        from django import db
+        db.reset_queries()
+        from testapp.models import Book, Person, PersonType
+        author_types = PersonType.objects.filter(title='Author')
+        author_people = Person.objects.filter(person_types__in=author_types)
+        written_books = Book.objects.filter(authors__in=author_people)
+        q = base.message_queue()
+        self.failUnless(len(db.connection.queries) == 0)
+        count = written_books.count()
+        self.failUnless(q.get() == False)
+        # execute the query again, this time it's cached
+        self.failUnless(written_books.count() == count)
+        self.failUnless(q.get() == True)
+        # change the person type of 'Author' to something else
+        pt = PersonType.objects.get(title='Author')
+        pt.title = 'NonAuthor'
+        pt.save()
+        self.failUnless(PersonType.objects.filter(title='Author').count() == 0)
+        q.clear()
+        db.reset_queries()
+        # now execute the same query;  the result should be diff and it should be
+        # a cache miss
+        new_count = written_books.count()
+        self.failUnless(new_count != count)
+        self.failUnless(q.get() == False)
+
 
 class TransactionSupportTest(TransactionQueryCacheBase):
     fixtures = base.johnny_fixtures

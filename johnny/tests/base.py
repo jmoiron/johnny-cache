@@ -81,6 +81,9 @@ class message_queue(object):
     def _hit(self, *a, **k): self.q.put(True)
     def _miss(self, *a, **k): self.q.put(False)
 
+    def clear(self):
+        while not self.q.empty():
+            self.q.get_nowait()
     def get(self): return self.q.get()
     def get_nowait(self): return self.q.get_nowait()
     def qsize(self): return self.q.qsize()

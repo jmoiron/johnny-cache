@@ -64,6 +64,21 @@ def invalidate(*tables, **kwargs):
         for t in map(resolve, tables):
             backend.keyhandler.invalidate_table(t, db)
 
+def get_tables_for_query(query):
+    """Takes a Django 'query' object and returns all tables that will be used in
+    that query as a list.  Note that where clauses can have their own querysets
+    with their own dependent queries, etc."""
+    from django.db.models.sql.where import WhereNode
+    from django.db.models.query import QuerySet
+    tables = list(query.tables)
+    if query.where and query.where.children and isinstance(query.where.children[0], WhereNode):
+        where_node = query.where.children[0]
+        for child in where_node.children:
+            for item in child:
+                if isinstance(item, QuerySet):
+                    tables += get_tables_for_query(item.query)
+    return list(set(tables))
+
 # The KeyGen is used only to generate keys.  Some of these keys will be used
 # directly in the cache, while others are only general purpose functions to
 # generate hashes off of one or more values.
@@ -224,18 +239,19 @@ class QueryCacheBackend(object):
             key, val = None, None
             # check the blacklist for any of the involved tables;  if it's not
             # there, then look for the value in the cache.
-            if cls.query.tables and not blacklist_match(*cls.query.tables):
-                gen_key = self.keyhandler.get_generation(*cls.query.tables, **{'db':db})
+            tables = get_tables_for_query(cls.query)
+            if tables and not blacklist_match(*tables):
+                gen_key = self.keyhandler.get_generation(*tables, **{'db':db})
                 key = self.keyhandler.sql_key(gen_key, sql, params, cls.get_ordering(), result_type, db)
                 val = self.cache_backend.get(key, None, db)
 
             if val is not None:
-                signals.qc_hit.send(sender=cls, tables=cls.query.tables,
+                signals.qc_hit.send(sender=cls, tables=tables,
                         query=(sql, params, cls.query.ordering_aliases),
                         size=len(val), key=key)
                 return val
 
-            signals.qc_miss.send(sender=cls, tables=cls.query.tables,
+            signals.qc_miss.send(sender=cls, tables=tables,
                     query=(sql, params, cls.query.ordering_aliases),
                     key=key)
 
