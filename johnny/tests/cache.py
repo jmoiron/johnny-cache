@@ -129,7 +129,11 @@ class MultiDbTest(TransactionQueryCacheBase):
         if len(getattr(settings, "DATABASES", [])) <= 1:
             print "\n  Skipping multi databases"
             return
+        if settings.DATABASE_ENGINE == 'sqlite3':
+            print "\n  Skipping test requiring multiple threads."
+            return
         from Queue import Queue as queue
+
         q = queue()
         other = lambda x: self._run_threaded(x, q)
 
@@ -196,6 +200,9 @@ class MultiDbTest(TransactionQueryCacheBase):
         """tests savepoints for multiple db's"""
         if len(getattr(settings, "DATABASES", [])) <= 1:
             print "\n  Skipping multi databases"
+            return
+        if settings.DATABASE_ENGINE == 'sqlite3':
+            print "\n  Skipping test requiring multiple threads."
             return
 
         from Queue import Queue as queue
@@ -575,6 +582,9 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         from django.db import transaction
         from testapp.models import Genre, Publisher
         from johnny import cache
+        if settings.DATABASE_ENGINE == 'sqlite3':
+            print "\n  Skipping test requiring multiple threads."
+            return
 
         self.failUnless(transaction.is_managed() == False)
         self.failUnless(transaction.is_dirty() == False)
@@ -623,6 +633,9 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         from django.db import transaction
         from testapp.models import Genre, Publisher
         from johnny import cache
+        if settings.DATABASE_ENGINE == 'sqlite3':
+            print "\n  Skipping test requiring multiple threads."
+            return
 
         self.failUnless(transaction.is_managed() == False)
         self.failUnless(transaction.is_dirty() == False)
