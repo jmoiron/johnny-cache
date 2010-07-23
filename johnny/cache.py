@@ -4,6 +4,8 @@
 """Johnny's main caching functionality."""
 
 import sys
+import re
+
 try:
     from functools import wraps
 except ImportError:
@@ -78,6 +80,32 @@ def get_tables_for_query(query):
                 if isinstance(item, QuerySet):
                     tables += get_tables_for_query(item.query)
     return list(set(tables))
+
+def get_tables_for_query11(query):
+    """Takes a django BaseQuery object and tries to return all tables that will
+    be used in that query as a list.  Unfortunately, the where clauses give us
+    "QueryWrapper" instead of "QuerySet" objects, so we have to parse SQL once
+    we get down to a certain layer to get the tables we are using.  This is
+    meant for use in Django 1.1.x only!  Later versions can use the above."""
+    from django.db.models.sql.where import WhereNode
+    from django.db.models.query_utils import QueryWrapper
+    def parse_tables_from_sql(sql):
+        """This attempts to parse tables out of sql.  Django's SQL compiler is
+        highly regular and always uses extended SQL forms like 'INNER JOIN'
+        instead of ','.  This probably needs a lot of testing for different
+        backends and is not guaranteed to work on a custom backend."""
+        table_re = re.compile(r'(?:FROM|JOIN) `(?P<table>\w+)`')
+        return table_re.findall(sql)
+
+    tables = list(query.tables)
+    if query.where and query.where.children and isinstance(query.where.children[0], WhereNode):
+        where_node = query.where.children[0]
+        for child in where_node.children:
+            for item in child:
+                if isinstance(item, QueryWrapper):
+                    tables += parse_tables_from_sql(item.data[0])
+    return list(set(tables))
+
 
 # The KeyGen is used only to generate keys.  Some of these keys will be used
 # directly in the cache, while others are only general purpose functions to
@@ -370,25 +398,26 @@ class QueryCacheBackend11(QueryCacheBackend):
                     return
 
             val, key = None, None
+            tables = get_tables_for_query11(cls)
             # check the blacklist for any of the involved tables;  if it's not
             # there, then look for the value in the cache.
-            if cls.tables and not blacklist_match(*cls.tables):
-                gen_key = self.keyhandler.get_generation(*cls.tables)
+            if tables and not blacklist_match(*tables):
+                gen_key = self.keyhandler.get_generation(*tables)
                 key = self.keyhandler.sql_key(gen_key, sql, params,
                         cls.ordering_aliases, result_type)
                 val = self.cache_backend.get(key, None)
 
                 if val is not None:
-                    signals.qc_hit.send(sender=cls, tables=cls.tables,
+                    signals.qc_hit.send(sender=cls, tables=tables,
                             query=(sql, params, cls.ordering_aliases),
                             size=len(val), key=key)
                     return val
 
             # we didn't find the value in the cache, so execute the query
             result = original(cls, result_type)
-            if cls.tables and not sql.startswith('UPDATE') and not sql.startswith('DELETE'):
+            if tables and not sql.startswith('UPDATE') and not sql.startswith('DELETE'):
                 # I think we should always be sending a signal here if we miss..
-                signals.qc_miss.send(sender=cls, tables=cls.tables,
+                signals.qc_miss.send(sender=cls, tables=tables,
                         query=(sql, params, cls.ordering_aliases),
                         key=key)
                 if hasattr(result, '__iter__'):
@@ -397,9 +426,9 @@ class QueryCacheBackend11(QueryCacheBackend):
                 # blacklisted, in which case we just don't care.
                 if key is not None:
                     self.cache_backend.set(key, result)
-            elif cls.tables and sql.startswith('UPDATE'):
+            elif tables and sql.startswith('UPDATE'):
                 # issue #1 in bitbucket, not invalidating on update
-                for table in cls.tables:
+                for table in tables:
                     self.keyhandler.invalidate_table(table)
             return result
         return newfun
