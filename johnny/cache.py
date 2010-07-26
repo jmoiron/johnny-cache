@@ -16,9 +16,9 @@ try:
 except ImportError:
     from md5 import md5
 
-from django.conf import settings
 import localstore
 import signals
+from johnny import settings
 from transaction import TransactionManager
 
 try:
@@ -30,9 +30,6 @@ except NameError:
         return False
 
 local = localstore.LocalStore()
-blacklist = getattr(settings, 'MAN_IN_BLACKLIST',
-            getattr(settings, 'JOHNNY_TABLE_BLACKLIST', []))
-blacklist = set(blacklist)
 
 def blacklist_match(*tables):
     """Returns True if a set of tables is in the blacklist, False otherwise."""
@@ -41,7 +38,7 @@ def blacklist_match(*tables):
     # should have relatively few tables involved, and I don't imagine that
     # blacklists would grow very vast.  The fastest i've been able to come
     # up with is to pre-create a blacklist set and use intersect.
-    return bool(blacklist.intersection(tables))
+    return bool(settings.BLACKLIST.intersection(tables))
 
 def get_backend():
     """Get's a QueryCacheBackend class for the current version of django."""
@@ -222,7 +219,7 @@ class QueryCacheBackend(object):
     __shared_state = {}
     def __init__(self, cache_backend=None, keyhandler=None, keygen=None):
         self.__dict__ = self.__shared_state
-        self.prefix = getattr(settings, 'JOHNNY_MIDDLEWARE_KEY_PREFIX', 'jc')
+        self.prefix = settings.MIDDLEWARE_KEY_PREFIX
         if keyhandler: self.kh_class = keyhandler
         if keygen: self.kg_class = keygen
         if not cache_backend and not hasattr(self, 'cache_backend'):

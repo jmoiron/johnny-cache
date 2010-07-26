@@ -14,7 +14,6 @@ except ImportError:
     from django.utils.functional import wraps  # Python 2.3, 2.4 fallback.
 
 
-from django.conf import settings
 import django
 
 
@@ -27,10 +26,11 @@ class TransactionManager(object):
     """
     _patched_var = False
     def __init__(self, cache_backend, keygen):
-        self.timeout = getattr(settings, 'JOHNNY_MIDDLEWARE_SECONDS', 0)
-        self.prefix = getattr(settings, 'JOHNNY_MIDDLEWARE_KEY_PREFIX', 'jc')
+        from johnny import cache, settings
 
-        from johnny import cache
+        self.timeout = settings.MIDDLEWARE_SECONDS
+        self.prefix = settings.MIDDLEWARE_KEY_PREFIX
+
         self.cache_backend = cache_backend
         self.local = cache.local
         self.keygen = keygen(self.prefix)
