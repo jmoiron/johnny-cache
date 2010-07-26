@@ -138,6 +138,7 @@ The following settings are available for the QuerySet Cache:
 * ``JOHNNY_MIDDLEWARE_KEY_PREFIX``
 * ``JOHNNY_MIDDLEWARE_SECONDS``
 * ``MAN_IN_BLACKLIST``
+* ``JOHNNY_CACHE_BACKEND``
 
 ``DISABLE_QUERYSET_CACHE`` will disable the QuerySet cache even if the
 middleware is installed.  This is mostly to make it easy for other modules
@@ -161,6 +162,11 @@ default value of ``0`` will work differently on different backends.
 exclude from the QuerySet Cache.  If you have no sense of humor, or want your
 settings file to be understandable, you can use the alias
 ``JOHNNY_TABLE_BLACKLIST``.  We just couldn't resist.
+
+``JOHNNY_CACHE_BACKEND`` is a cache backend URI similar to what is used by
+Django by default, but only used for Johnny. This allows you to seperate
+the Cache that is used by Johnny from the caching backend of the rest of your
+site.
 
 Signals
 ~~~~~~~
