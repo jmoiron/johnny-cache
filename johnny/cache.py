@@ -70,12 +70,21 @@ def get_tables_for_query(query):
     from django.db.models.sql.where import WhereNode
     from django.db.models.query import QuerySet
     tables = list(query.tables)
-    if query.where and query.where.children and isinstance(query.where.children[0], WhereNode):
-        where_node = query.where.children[0]
+
+    def get_tables(where_node, tables):
         for child in where_node.children:
+            if isinstance(child, WhereNode) and child.children:
+                tables = get_tables(child, tables)
+                continue
             for item in child:
                 if isinstance(item, QuerySet):
                     tables += get_tables_for_query(item.query)
+        return tables
+
+    if query.where and query.where.children and isinstance(query.where.children[0], WhereNode):
+        where_node = query.where.children[0]
+        tables = get_tables(where_node, tables)
+
     return list(set(tables))
 
 def get_tables_for_query11(query):
