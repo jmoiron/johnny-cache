@@ -34,8 +34,7 @@ class QueryCacheMiddleware(object):
         if not self.installed and not self.disabled:
             # when we install, lets refresh the blacklist, just in case johnny
             # was loaded before the setting exists somehow...
-            blacklist = settings.BLACKLIST
-            cache.blacklist = set(blacklist)
+            cache.blacklist = settings.BLACKLIST
             self.query_cache_backend = cache.get_backend()(cache_backend)
             self.query_cache_backend.patch()
             self.installed = True
