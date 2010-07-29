@@ -10,4 +10,5 @@ MIDDLEWARE_KEY_PREFIX = getattr(settings, 'JOHNNY_MIDDLEWARE_KEY_PREFIX', 'jc')
 
 MIDDLEWARE_SECONDS = getattr(settings, 'JOHNNY_MIDDLEWARE_SECONDS', 0)
 
-CACHE_BACKEND = getattr(settings, 'JOHNNY_CACHE_BACKEND', None)
+CACHE_BACKEND = getattr(settings, 'JOHNNY_CACHE_BACKEND', 
+                getattr(settings, 'CACHE_BACKEND', None))
