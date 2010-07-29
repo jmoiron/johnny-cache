@@ -99,6 +99,31 @@ any cache keys to the `LocalStore <'localstore_cache.html'>`_ instead.
 On commit, these keys are pushed to the global cache;  on rollback, they are
 discarded.
 
+Using with TransactionMiddleware
+--------------------------------
+
+Django ships with a middleware called 
+``django.middleware.transaction.TransactionMiddleware``, which wraps all
+requests within a transaction and then rollsback when exceptions are thrown
+from within the view.  Johnny only pushes transactional data to the cache on
+commit, but the TransactionMiddleware will leave transactions uncommitted
+if they are not dirty (if no writes have been performed during the request).
+This means that if you have views that don't write anything, and also use the
+TransactionMiddleware, you'll never populate the cache with the querysets
+used in those views.
+
+This problem is described in `django ticket #9964`_, but unfortunately fixing
+it isn't straightforward because the "correct" thing to do here is in dispute.
+Starting with version 0.3, Johnny includes a middleware called
+``johnny.middleware.CommittingTransactionMiddleware``, which is the same as
+the built in version, but always commits transactions on success.  Depending
+on your database, there are still ways to have SELECT statements modify data,
+but for the majority of people committing after every request, even when no
+UPDATE or INSERTs have been done is likely harmless and will make Johnny
+function much more smoothly.
+
+.. _django ticket #9964: http://code.djangoproject.com/ticket/9964
+
 Savepoints
 ----------
 
@@ -177,6 +202,7 @@ The QuerySet Cache defines two signals:
 * ``johnny.cache.signals.qc_miss``, fired after a cache miss
 
 The sender of these signals is always the ``QueryCacheBackend`` itself.
+
 
 Customization
 ~~~~~~~~~~~~~
