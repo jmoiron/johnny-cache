@@ -50,11 +50,11 @@ class BlackListTest(QueryCacheBase):
     fixtures = base.johnny_fixtures
 
     def test_basic_blacklist(self):
-        from johnny import cache
+        from johnny import cache, settings
         from testapp.models import Genre, Book
         q = base.message_queue()
-        old = cache.blacklist
-        cache.blacklist = set(['testapp_genre'])
+        old = settings.BLACKLIST
+        settings.BLACKLIST = set(['testapp_genre'])
         connection.queries = []
         Book.objects.get(id=1)
         Book.objects.get(id=1)
@@ -62,7 +62,7 @@ class BlackListTest(QueryCacheBase):
         list(Genre.objects.all())
         list(Genre.objects.all())
         self.failUnless(not any((q.get_nowait(), q.get_nowait())))
-        cache.blacklist = old
+        settings.BLACKLIST = old
 
 
 class MultiDbTest(TransactionQueryCacheBase):
