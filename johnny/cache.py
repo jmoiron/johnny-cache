@@ -112,6 +112,19 @@ def get_tables_for_query11(query):
                     tables += parse_tables_from_sql(item.data[0])
     return list(set(tables))
 
+from functools import wraps
+
+def timer(func):
+    import time
+    times = []
+    @wraps(func)
+    def foo(*args, **kwargs):
+        t0 = time.time()
+        ret = func(*args, **kwargs)
+        times.append(time.time() - t0)
+        print "%d runs, %0.6f avg" % (len(times), sum(times)/float(len(times)))
+        return ret
+    return foo
 
 # The KeyGen is used only to generate keys.  Some of these keys will be used
 # directly in the cache, while others are only general purpose functions to
@@ -144,15 +157,24 @@ class KeyGen(object):
             db = db[0:68] + self.gen_key(db[68:])
         return '%s_%s_multi_%s' % (self.prefix, db, self.gen_key(*values))
 
+    @staticmethod
+    def _convert(x):
+        if isinstance(x, unicode):
+            return x.encode('utf-8')
+        return str(x)
+
+    @staticmethod
+    def _recursive_convert(x, key):
+        for item in x:
+            if isinstance(item, (tuple, list)):
+                KeyGen._recursive_convert(item, key)
+            else:
+                key.update(KeyGen._convert(item))
+
     def gen_key(self, *values):
         """Generate a key from one or more values."""
-        def convert(x):
-            if isinstance(x, unicode):
-                return x.encode('utf-8')
-            return str(x)
         key = md5()
-        for v in values:
-            key.update(convert(v))
+        KeyGen._recursive_convert(values, key)
         return key.hexdigest()
 
 class KeyHandler(object):
