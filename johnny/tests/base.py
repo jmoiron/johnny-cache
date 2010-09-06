@@ -10,6 +10,8 @@ from django.conf import settings
 from django.core.management import call_command
 from django.db.models.loading import load_app
 
+from johnny import settings as johnny_settings
+
 # order matters here;  I guess we aren't deferring foreign key checking :\
 johnny_fixtures = ['authors.json', 'genres.json', 'publishers.json', 'books.json']
 
@@ -53,8 +55,8 @@ class TransactionJohnnyWebTestCase(TransactionJohnnyTestCase):
         self.saved_MIDDLEWARE_CLASSES = settings.MIDDLEWARE_CLASSES
         if getattr(self.__class__, 'middleware', None):
             settings.MIDDLEWARE_CLASSES = self.__class__.middleware
-        self.saved_DISABLE_SETTING = getattr(settings, 'DISABLE_QUERYSET_CACHE', False)
-        settings.DISABLE_QUERYSET_CACHE = False
+        self.saved_DISABLE_SETTING = getattr(johnny_settings, 'DISABLE_QUERYSET_CACHE', False)
+        johnny_settings.DISABLE_QUERYSET_CACHE = False
         self.middleware = middleware.QueryCacheMiddleware()
         self.saved_ROOT_URLCONF = settings.ROOT_URLCONF
         settings.ROOT_URLCONF = 'johnny.tests.testapp.urls'
@@ -62,7 +64,7 @@ class TransactionJohnnyWebTestCase(TransactionJohnnyTestCase):
 
     def _post_teardown(self):
         self.middleware.unpatch()
-        settings.DISABLE_QUERYSET_CACHE = self.saved_DISABLE_SETTING
+        johnny_settings.DISABLE_QUERYSET_CACHE = self.saved_DISABLE_SETTING
         settings.MIDDLEWARE_CLASSES = self.saved_MIDDLEWARE_CLASSES
         settings.ROOT_URLCONF = self.saved_ROOT_URLCONF
         super(TransactionJohnnyWebTestCase, self)._post_teardown()

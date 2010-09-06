@@ -6,6 +6,7 @@
 from django.conf import settings
 from django.db import connection
 from johnny import middleware
+from johnny import settings as johnny_settings
 import base
 
 try:
@@ -20,13 +21,13 @@ except NameError:
 __all__ = ['MultiDbTest', 'SingleModelTest', 'MultiModelTest', 'TransactionSupportTest', 'BlackListTest']
 
 def _pre_setup(self):
-    self.saved_DISABLE_SETTING = getattr(settings, 'DISABLE_QUERYSET_CACHE', False)
-    settings.DISABLE_QUERYSET_CACHE = False
+    self.saved_DISABLE_SETTING = getattr(johnny_settings, 'DISABLE_QUERYSET_CACHE', False)
+    johnny_settings.DISABLE_QUERYSET_CACHE = False
     self.middleware = middleware.QueryCacheMiddleware()
 
 def _post_teardown(self):
     self.middleware.unpatch()
-    settings.DISABLE_QUERYSET_CACHE = self.saved_DISABLE_SETTING
+    johnny_settings.DISABLE_QUERYSET_CACHE = self.saved_DISABLE_SETTING
 
 class QueryCacheBase(base.JohnnyTestCase):
     def _pre_setup(self):
@@ -53,8 +54,8 @@ class BlackListTest(QueryCacheBase):
         from johnny import cache, settings
         from testapp.models import Genre, Book
         q = base.message_queue()
-        old = settings.BLACKLIST
-        settings.BLACKLIST = set(['testapp_genre'])
+        old = johnny_settings.BLACKLIST
+        johnny_settings.BLACKLIST = set(['testapp_genre'])
         connection.queries = []
         Book.objects.get(id=1)
         Book.objects.get(id=1)
@@ -62,7 +63,7 @@ class BlackListTest(QueryCacheBase):
         list(Genre.objects.all())
         list(Genre.objects.all())
         self.failUnless(not any((q.get_nowait(), q.get_nowait())))
-        settings.BLACKLIST = old
+        johnny_settings.BLACKLIST = old
 
 
 class MultiDbTest(TransactionQueryCacheBase):
