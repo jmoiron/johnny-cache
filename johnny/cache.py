@@ -20,6 +20,7 @@ import localstore
 import signals
 from johnny import settings
 from transaction import TransactionManager
+from django.core.exceptions import ImproperlyConfigured
 
 try:
     any
