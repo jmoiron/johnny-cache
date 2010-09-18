@@ -9,6 +9,7 @@ from django.core.cache import get_cache
 from django.middleware import transaction as trans_middleware
 from django.db import transaction
 from johnny import cache, settings
+from django.core import signals
 
 if settings.CACHE_BACKEND:
     cache_backend = get_cache(settings.CACHE_BACKEND)
