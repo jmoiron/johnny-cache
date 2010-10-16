@@ -95,7 +95,7 @@ class MultiDbTest(TransactionQueryCacheBase):
     def test_basic_queries(self):
         """Tests basic queries and that the cache is working for multiple db's"""
         if len(getattr(settings, "DATABASES", [])) <= 1:
-            print "\n  Skipping multi databases"
+            print "\n  Skipping multi database tests"
             return
 
         from testapp.models import Genre, Book, Publisher, Person
@@ -123,12 +123,15 @@ class MultiDbTest(TransactionQueryCacheBase):
         g2 = Genre.objects.using('second').get(pk=1)
         for c in connections:
             self.failUnless(len(connections[c].queries) == 1)
+        # test for a regression on the WhereNode, bitbucket #20
+        g1 = Genre.objects.get(Q(title__iexact="A second database"))
+
 
     def test_transactions(self):
         """Tests transaction rollbacks and local cache for multiple dbs"""
 
         if len(getattr(settings, "DATABASES", [])) <= 1:
-            print "\n  Skipping multi databases"
+            print "\n  Skipping multi database tests"
             return
         if settings.DATABASE_ENGINE == 'sqlite3':
             print "\n  Skipping test requiring multiple threads."
@@ -200,7 +203,7 @@ class MultiDbTest(TransactionQueryCacheBase):
     def test_savepoints(self):
         """tests savepoints for multiple db's"""
         if len(getattr(settings, "DATABASES", [])) <= 1:
-            print "\n  Skipping multi databases"
+            print "\n  Skipping multi database tests"
             return
         if settings.DATABASE_ENGINE == 'sqlite3':
             print "\n  Skipping test requiring multiple threads."
