@@ -43,7 +43,9 @@ MEDIA_URL = ''
 # trailing slash.
 # Examples: "http://foo.com/media/", "/media/".
 ADMIN_MEDIA_PREFIX = '/media/'
+#CACHE_BACKEND="johnny.backends.filebased:///tmp/johnny_cache.cc"
 CACHE_BACKEND="johnny.backends.locmem://"
+
 
 # Make this unique, and don't share it with anybody.
 SECRET_KEY = '_vpn1a^j(6&+3qip2me4f#&8#m#*#icc!%=x=)rha4k=!4m8s4'
