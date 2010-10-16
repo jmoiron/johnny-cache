@@ -57,6 +57,9 @@ class TransactionJohnnyWebTestCase(TransactionJohnnyTestCase):
             settings.MIDDLEWARE_CLASSES = self.__class__.middleware
         self.saved_DISABLE_SETTING = getattr(johnny_settings, 'DISABLE_QUERYSET_CACHE', False)
         johnny_settings.DISABLE_QUERYSET_CACHE = False
+        self.saved_TEMPLATE_LOADERS = settings.TEMPLATE_LOADERS
+        if 'django.template.loaders.app_directories.load_template_source' not in settings.TEMPLATE_LOADERS:
+            settings.TEMPLATE_LOADERS += ('django.template.loaders.app_directories.load_template_source',)
         self.middleware = middleware.QueryCacheMiddleware()
         self.saved_ROOT_URLCONF = settings.ROOT_URLCONF
         settings.ROOT_URLCONF = 'johnny.tests.testapp.urls'
@@ -67,6 +70,7 @@ class TransactionJohnnyWebTestCase(TransactionJohnnyTestCase):
         johnny_settings.DISABLE_QUERYSET_CACHE = self.saved_DISABLE_SETTING
         settings.MIDDLEWARE_CLASSES = self.saved_MIDDLEWARE_CLASSES
         settings.ROOT_URLCONF = self.saved_ROOT_URLCONF
+        settings.TEMPLATE_LOADERS = self.saved_TEMPLATE_LOADERS
         super(TransactionJohnnyWebTestCase, self)._post_teardown()
 
 class message_queue(object):
