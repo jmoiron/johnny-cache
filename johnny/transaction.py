@@ -282,6 +282,10 @@ class TransactionManager(object):
                 self._commit_savepoint(sid, using)
         return newfun
 
+    def _getreal(self, name):
+        return getattr(django_transaction, 'real_%s' % name,
+                getattr(django_transaction, name))
+
     def patch(self):
         """
         This function monkey patches commit and rollback
@@ -289,16 +293,15 @@ class TransactionManager(object):
         It does not yet support savepoints.
         """
         if not self._patched_var:
-            self._originals['rollback'] = django_transaction.rollback
-            self._originals['commit'] = django_transaction.commit
+            self._originals['rollback'] = self._getreal('rollback')
+            self._originals['commit'] = self._getreal('commit')
+            self._originals['savepoint'] = self._getreal('savepoint')
+            self._originals['savepoint_rollback'] = self._getreal('savepoint_rollback')
+            self._originals['savepoint_commit'] = self._getreal('savepoint_commit')
             django_transaction.rollback = self._patched(django_transaction.rollback, False)
             django_transaction.commit = self._patched(django_transaction.commit, True)
-
-            self._originals['savepoint'] = django_transaction.savepoint
             django_transaction.savepoint = self._savepoint(django_transaction.savepoint)
-            self._originals['savepoint_rollback'] = django_transaction.savepoint_rollback
             django_transaction.savepoint_rollback = self._savepoint_rollback(django_transaction.savepoint_rollback)
-            self._originals['savepoint_commit'] = django_transaction.savepoint_commit
             django_transaction.savepoint_commit = self._savepoint_commit(django_transaction.savepoint_commit)
 
             self._patched_var = True
