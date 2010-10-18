@@ -45,6 +45,7 @@ MEDIA_URL = ''
 ADMIN_MEDIA_PREFIX = '/media/'
 #CACHE_BACKEND="johnny.backends.filebased:///tmp/johnny_cache.cc"
 CACHE_BACKEND="johnny.backends.locmem://"
+#CACHE_BACKEND="johnny.backends.memcached://localhost:11211/"
 
 
 # Make this unique, and don't share it with anybody.
