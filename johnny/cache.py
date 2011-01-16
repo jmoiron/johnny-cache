@@ -108,6 +108,8 @@ def get_tables_for_query11(query):
     if query.where and query.where.children and isinstance(query.where.children[0], WhereNode):
         where_node = query.where.children[0]
         for child in where_node.children:
+            if isinstance(child, WhereNode):
+                continue
             for item in child:
                 if isinstance(item, QueryWrapper):
                     tables += parse_tables_from_sql(item.data[0])
