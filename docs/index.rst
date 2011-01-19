@@ -87,6 +87,19 @@ New in this version
 * addition of `TransactionCommittingMiddleware <queryset_cache.html#using-with-transactionmiddleware>`_
 * python 2.4 support
 
+Future Django 1.3 Support
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``johnny-cache`` is currently *not* compatible with Django 1.3b.  Version 0.2.1
+provides cache classes in the vein of the new cache classes for what will be
+Django 1.3, but johnny's transaction support is not functional in 1.3 yet.
+
+After 1.3 final is released, johnny 0.3 will be released, which will fully
+support 1.1-1.3.  If you need to run with 1.3 or django-trunk in the meantime,
+be mindful that Johnny can potentially cache (forever) reads that are done
+within a failing transaction, and please use it only if you are sure that this
+will not impact your application.
+
 In Depth Documentation
 ~~~~~~~~~~~~~~~~~~~~~~
 
