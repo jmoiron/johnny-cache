@@ -74,7 +74,7 @@ def get_tables_for_query(query):
 
     def get_tables(where_node, tables):
         for child in where_node.children:
-            if isinstance(child, WhereNode) and child.children:
+            if isinstance(child, WhereNode):# and child.children:
                 tables = get_tables(child, tables)
                 continue
             for item in child:

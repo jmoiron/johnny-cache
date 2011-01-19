@@ -6,10 +6,18 @@
 from django.db import models
 from django.db.models import permalink
 from django.conf import settings
-from django.contrib.auth.models import User
 from django.utils.translation import ugettext_lazy as _
 
 #from basic.people.models import Person
+
+class User(models.Model):
+    """User model."""
+    first_name = models.CharField('first name', blank=True, max_length=128)
+    last_name = models.CharField('last name', blank=True, max_length=128)
+    username = models.CharField('username', blank=True, max_length=128)
+
+    def __repr__(self):
+        return '<User: %s %s>' % (self.first_name, self.last_name)
 
 class PersonType(models.Model):
     """Person type model."""
@@ -37,11 +45,11 @@ class Person(models.Model):
         (1, 'Male'),
         (2, 'Female'),
     )
+    user = models.ForeignKey(User, blank=True, null=True)
     first_name = models.CharField(_('first name'), blank=True, max_length=100)
     middle_name = models.CharField(_('middle name'), blank=True, max_length=100)
     last_name = models.CharField(_('last name'), blank=True, max_length=100)
     slug = models.SlugField(_('slug'), unique=True)
-    user = models.ForeignKey(User, blank=True, null=True, help_text='If the person is an existing user of your site.')
     gender = models.PositiveSmallIntegerField(_('gender'), choices=GENDER_CHOICES, blank=True, null=True)
     mugshot = models.FileField(_('mugshot'), upload_to='mugshots', blank=True)
     mugshot_credit = models.CharField(_('mugshot credit'), blank=True, max_length=200)
@@ -164,7 +172,6 @@ class Highlight(models.Model):
     def get_absolute_url(self):
         return ('book_detail', None, { 'slug': self.book.slug })
 
-
 class Page(models.Model):
     """Page model"""
     user = models.ForeignKey(User)
@@ -186,4 +193,6 @@ class Milk(models.Model):
 
     class Meta:
         db_table = u'ミルク'
+
+
 

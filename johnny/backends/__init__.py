@@ -9,5 +9,5 @@ application's `cache backend monkey-patch
 <http://github.com/mmalone/django-caching/blob/master/app/cache.py>`_.
 """
 
-__all__ = ['memcached', 'locmem']
+__all__ = ['memcached', 'locmem', 'filebased']
 

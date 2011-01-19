@@ -15,6 +15,7 @@ To use, change your ``CACHE_BACKEND`` setting to something like this::
 
 from django.core.cache.backends import locmem
 from django.utils.encoding import smart_str
+import django
 import sys
 
 class CacheClass(locmem.CacheClass):
@@ -28,4 +29,6 @@ class CacheClass(locmem.CacheClass):
             timeout = sys.maxint
         return super(CacheClass, self).set(smart_str(key), value, timeout)
 
-
+if django.VERSION[:2] > (1, 2):
+    class LocMemCache(CacheClass):
+        pass

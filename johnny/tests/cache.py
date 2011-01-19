@@ -546,6 +546,12 @@ class MultiModelTest(QueryCacheBase):
         new_count = written_books.count()
         self.failUnless(new_count != count)
         self.failUnless(q.get() == False)
+        PersonType.objects.filter(title='NonAuthor').order_by('-title')[:5]
+
+    def test_foreign_key_delete_cascade(self):
+        """From #32, test that if you have 'Foo' and 'Bar', with bar.foo => Foo,
+        and you delete foo, bar.foo is also deleted, which means you have to
+        invalidate Bar when deletions are made in Foo (but not changes)."""
 
 
 class TransactionSupportTest(TransactionQueryCacheBase):

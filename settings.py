@@ -1,11 +1,14 @@
 # Django settings for proj project.
 
+import django
+
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = ()
 
 MANAGERS = ADMINS
+
 DATABASE_ENGINE = 'sqlite3'     # 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'oracle'.
 DATABASE_NAME = 'johnny-db.sql' # Or path to database file if using sqlite3.
 DATABASE_USER = ''              # Not used with sqlite3.
@@ -43,9 +46,12 @@ MEDIA_URL = ''
 # trailing slash.
 # Examples: "http://foo.com/media/", "/media/".
 ADMIN_MEDIA_PREFIX = '/media/'
-#CACHE_BACKEND="johnny.backends.filebased:///tmp/johnny_cache.cc"
-CACHE_BACKEND="johnny.backends.locmem://"
-#CACHE_BACKEND="johnny.backends.memcached://localhost:11211/"
+if django.VERSION[:2] < (1, 3):
+    CACHE_BACKEND="johnny.backends.locmem://"
+    #CACHE_BACKEND="johnny.backends.memcached://localhost:11211/"
+    #CACHE_BACKEND="johnny.backends.filebased:///tmp/johnny_cache.cc"
+else:
+    CACHE = { 'default' : { 'BACKEND': 'johnny.backends.locmem.LocMemCache' }}
 
 
 # Make this unique, and don't share it with anybody.
@@ -73,7 +79,6 @@ TEMPLATE_DIRS = (
 )
 
 INSTALLED_APPS = (
-    #'django.contrib.contenttypes',
     #'django.contrib.auth',
     #'django.contrib.sessions',
     #'django.contrib.sites',
