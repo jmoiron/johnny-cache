@@ -69,6 +69,7 @@ class TestJohnnyTransactionMiddleware(base.TransactionJohnnyWebTestCase):
         populate the cache properly."""
         connection.queries = []
         q = base.message_queue()
+        import ipdb; ipdb.set_trace();
         response = self.client.get('/test/template_queries')
         self.failUnless(q.get() is False)
         response = self.client.get('/test/template_queries')

@@ -82,9 +82,10 @@ see if you are doing anything that might require manual invalidation.
 New in this version
 ~~~~~~~~~~~~~~~~~~~
 
-* `blacklist support <queryset_cache.html#settings>`_ (``MAN_IN_BLACKLIST``)
-* fix to allow unicode table & column names
-* fix bulk updates to correctly invalidate cache
+* many, many bugfixes
+* fixes for invalidation on queries that contain subselects in WHERE clauses
+* addition of `TransactionCommittingMiddleware <queryset_cache.html#using-with-transactionmiddleware>`_
+* python 2.4 support
 
 In Depth Documentation
 ~~~~~~~~~~~~~~~~~~~~~~

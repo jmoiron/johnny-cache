@@ -114,7 +114,7 @@ used in those views.
 
 This problem is described in `django ticket #9964`_, but unfortunately fixing
 it isn't straightforward because the "correct" thing to do here is in dispute.
-Starting with version 0.3, Johnny includes a middleware called
+Starting with version 0.2.1, Johnny includes a middleware called
 ``johnny.middleware.CommittingTransactionMiddleware``, which is the same as
 the built in version, but always commits transactions on success.  Depending
 on your database, there are still ways to have SELECT statements modify data,

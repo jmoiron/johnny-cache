@@ -9,12 +9,20 @@ ADMINS = ()
 
 MANAGERS = ADMINS
 
-DATABASE_ENGINE = 'sqlite3'     # 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'oracle'.
-DATABASE_NAME = 'johnny-db.sql' # Or path to database file if using sqlite3.
-DATABASE_USER = ''              # Not used with sqlite3.
-DATABASE_PASSWORD = ''          # Not used with sqlite3.
-DATABASE_HOST = ''              # Set to empty string for localhost. Not used with sqlite3.
-DATABASE_PORT = ''              # Set to empty string for default. Not used with sqlite3.
+if django.VERSION[:2] < (1, 3):
+    DATABASE_ENGINE = 'sqlite3'     # 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'oracle'.
+    DATABASE_NAME = 'johnny-db.sql' # Or path to database file if using sqlite3.
+    DATABASE_USER = ''              # Not used with sqlite3.
+    DATABASE_PASSWORD = ''          # Not used with sqlite3.
+    DATABASE_HOST = ''              # Set to empty string for localhost. Not used with sqlite3.
+    DATABASE_PORT = ''              # Set to empty string for default. Not used with sqlite3.
+else:
+    DATABASES = {
+        'default' : {
+            'ENGINE' : 'django.db.backends.sqlite3',
+            'NAME' : 'johnny-db.sql',
+        }
+    }
 
 # Local time zone for this installation. Choices can be found here:
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
@@ -46,6 +54,7 @@ MEDIA_URL = ''
 # trailing slash.
 # Examples: "http://foo.com/media/", "/media/".
 ADMIN_MEDIA_PREFIX = '/media/'
+
 if django.VERSION[:2] < (1, 3):
     CACHE_BACKEND="johnny.backends.locmem://"
     #CACHE_BACKEND="johnny.backends.memcached://localhost:11211/"

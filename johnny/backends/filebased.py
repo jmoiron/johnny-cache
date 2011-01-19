@@ -10,6 +10,7 @@ To use, change your ``CACHE_BACKEND`` setting to something like this::
 
 from django.core.cache.backends import filebased
 from django.utils.encoding import smart_str
+import django
 import sys
 
 # NOTE: We aren't using smart_str here, because the underlying library will
@@ -26,4 +27,6 @@ class CacheClass(filebased.CacheClass):
             timeout = sys.maxint
         return super(CacheClass, self).set(key, value, timeout)
 
-
+if django.VERSION[:2] < (1, 3):
+    class FileBasedCache(CacheClass):
+        pass
