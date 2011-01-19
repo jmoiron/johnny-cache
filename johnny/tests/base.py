@@ -5,6 +5,7 @@
 
 import sys
 
+import django
 from django.test import TestCase, TransactionTestCase
 from django.conf import settings
 from django.core.management import call_command
@@ -58,8 +59,12 @@ class TransactionJohnnyWebTestCase(TransactionJohnnyTestCase):
         self.saved_DISABLE_SETTING = getattr(johnny_settings, 'DISABLE_QUERYSET_CACHE', False)
         johnny_settings.DISABLE_QUERYSET_CACHE = False
         self.saved_TEMPLATE_LOADERS = settings.TEMPLATE_LOADERS
-        if 'django.template.loaders.app_directories.load_template_source' not in settings.TEMPLATE_LOADERS:
-            settings.TEMPLATE_LOADERS += ('django.template.loaders.app_directories.load_template_source',)
+        if django.VERSION[:2] < (1, 3):
+            if 'django.template.loaders.app_directories.load_template_source' not in settings.TEMPLATE_LOADERS:
+                settings.TEMPLATE_LOADERS += ('django.template.loaders.app_directories.load_template_source',)
+        else:
+            if 'django.template.loaders.app_directories.Loader' not in settings.TEMPLATE_LOADERS:
+                settings.TEMPLATE_LOADERS += ('django.template.loaders.app_directories.Loader',)
         self.middleware = middleware.QueryCacheMiddleware()
         self.saved_ROOT_URLCONF = settings.ROOT_URLCONF
         settings.ROOT_URLCONF = 'johnny.tests.testapp.urls'
