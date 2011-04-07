@@ -6,6 +6,7 @@
 from django.conf import settings
 from django.db import connection
 from johnny import middleware
+import django
 import base
 
 try:
@@ -40,6 +41,9 @@ class TestTransactionMiddleware(base.TransactionJohnnyWebTestCase):
     def test_queries_from_templates(self):
         """Verify that doing the same request w/o a db write twice does not
         populate the cache properly."""
+        # it seems that django 1.3 doesn't exhibit this bug!
+        if django.VERSION[:2] == (1, 3):
+            return
         connection.queries = []
         q = base.message_queue()
         response = self.client.get('/test/template_queries')
