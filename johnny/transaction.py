@@ -18,11 +18,14 @@ import django
 
 
 class TransactionManager(object):
-    """
-    TransactionManager is a wrapper around a cache_backend that is transaction aware in django.
-    Basically, if we are in a transaction it will return the locally cached version.
-    On rollback, it will flush all local caches
-    On commit, it will push them up to the cache backend
+    """TransactionManager is a wrapper around a cache_backend that is
+    transaction aware.
+
+    If we are in a transaction, it will return the locally cached version.
+
+      * On rollback, it will flush all local caches
+      * On commit, it will push them up to the real shared cache backend 
+        (ex. memcached).
     """
     _patched_var = False
     def __init__(self, cache_backend, keygen):
@@ -97,14 +100,14 @@ class TransactionManager(object):
             using = using[0:68] + self.keygen.gen_key(using[68:])
         return using
 
-    def set(self, key, val, timeout = 0, using=None):
+    def set(self, key, val, timeout=None, using=None):
         """
         Set will be using the generational key, so if another thread
         bumps this key, the localstore version will still be invalid.
         If the key is bumped during a transaction it will be new
         to the global cache on commit, so it will still be a bump.
         """
-        if not timeout:
+        if timeout is None:
             timeout = self.timeout
         if self.is_managed() and self._patched_var:
             self.local[key] = val
@@ -149,11 +152,13 @@ class TransactionManager(object):
             #1.1 version
             original()
             self._flush(commit=commit)
+
         if django.VERSION[:2] == (1,1):
             return newfun11
         elif django.VERSION[:2] in ((1,2), (1,3)):
             return newfun
         return original
+
     def _uses_savepoints(self):
         return connection.features.uses_savepoints
 

@@ -56,11 +56,17 @@ MEDIA_URL = ''
 ADMIN_MEDIA_PREFIX = '/media/'
 
 if django.VERSION[:2] < (1, 3):
-    CACHE_BACKEND="johnny.backends.locmem://"
-    #CACHE_BACKEND="johnny.backends.memcached://localhost:11211/"
+    #CACHE_BACKEND="johnny.backends.locmem://"
+    CACHE_BACKEND="johnny.backends.memcached://localhost:11211/"
     #CACHE_BACKEND="johnny.backends.filebased:///tmp/johnny_cache.cc"
 else:
-    CACHE = { 'default' : { 'BACKEND': 'johnny.backends.locmem.LocMemCache' }}
+    #CACHES = { 'default' : { 'BACKEND': 'johnny.backends.locmem.LocMemCache' }}
+    CACHES = {
+        'default' : {
+            'BACKEND': 'johnny.backends.memcached.MemcachedCache',
+            'LOCATION': ['localhost:11211'],
+        }
+    }
 
 
 # Make this unique, and don't share it with anybody.

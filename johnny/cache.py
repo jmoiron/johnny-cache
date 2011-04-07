@@ -200,6 +200,7 @@ class KeyHandler(object):
         """Creates a random generation value for a single table name"""
         key = self.keygen.gen_table_key(table, db)
         val = self.cache_backend.get(key, None, db)
+        #print str(val).ljust(32), key
         if val == None:
             val = self.keygen.random_generator()
             self.cache_backend.set(key, val, 0, db)
