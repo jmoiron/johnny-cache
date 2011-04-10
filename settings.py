@@ -112,3 +112,7 @@ try:
 except ImportError:
     pass
 
+# set up a multi-db router if there are multiple databases set
+lcls = locals()
+if 'DATABASES' in lcls and len(lcls['DATABASES']) > 1:
+    DATABASE_ROUTERS = ['routers.MultiSyncedRouter']

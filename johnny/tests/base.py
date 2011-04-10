@@ -4,6 +4,7 @@
 """Base test class for Johnny Cache Tests."""
 
 import sys
+from functools import wraps
 
 import django
 from django.test import TestCase, TransactionTestCase
@@ -16,6 +17,30 @@ from johnny import settings as johnny_settings
 # order matters here;  I guess we aren't deferring foreign key checking :\
 johnny_fixtures = ['authors.json', 'genres.json', 'publishers.json', 'books.json']
 
+def show_johnny_signals(hit=None, miss=None):
+    """A decorator that can be put on a test function that will show the
+    johnny hit/miss signals by default, or do what is provided by the hit
+    and miss keyword args."""
+    from pprint import pformat
+    def _hit(*args, **kwargs):
+        print "hit:\n\t%s\n\t%s\n" % (pformat(args), pformat(kwargs))
+    def _miss(*args, **kwargs):
+        print "miss:\n\t%s\n\t%s\n" % (pformat(args), pformat(kwargs))
+    hit = _hit if hit is None else hit
+    miss = _miss if miss is None else miss
+    def deco(func):
+        @wraps(func)
+        def wrapped(*args, **kwargs):
+            from johnny.signals import qc_hit, qc_miss
+            qc_hit.connect(hit)
+            qc_miss.connect(miss)
+            ret = func(*args, **kwargs)
+            qc_hit.disconnect(hit)
+            qc_miss.disconnect(miss)
+            return ret
+        return wrapped
+    return deco
+
 def _pre_setup(self):
     self.saved_INSTALLED_APPS = settings.INSTALLED_APPS
     self.saved_DEBUG = settings.DEBUG
@@ -27,6 +52,10 @@ def _pre_setup(self):
     # load our fake application and syncdb
     load_app(test_app)
     call_command('syncdb', verbosity=0, interactive=False)
+    if hasattr(settings, 'DATABASES'):
+        for dbname in settings.DATABASES:
+            if dbname != 'default':
+                call_command('syncdb', verbosity=0, interactive=False, database=dbname)
 
 def _post_teardown(self):
     settings.INSTALLED_APPS = self.saved_INSTALLED_APPS

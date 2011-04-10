@@ -98,17 +98,19 @@ class MultiDbTest(TransactionQueryCacheBase):
             print "\n  Skipping multi database tests"
             return
 
+        from pprint import pformat
         from testapp.models import Genre, Book, Publisher, Person
         from django.db import connections
+
         self.failUnless("default" in getattr(settings, "DATABASES"))
         self.failUnless("second" in getattr(settings, "DATABASES"))
 
         g1 = Genre.objects.using("default").get(pk=1)
         g1.title = "A default database"
-        g1.save()
+        g1.save(using='default')
         g2 = Genre.objects.using("second").get(pk=1)
         g2.title = "A second database"
-        g2.save()
+        g2.save(using='second')
         for c in connections:
             connections[c].queries = []
         #fresh from cache since we saved each
@@ -123,8 +125,6 @@ class MultiDbTest(TransactionQueryCacheBase):
         g2 = Genre.objects.using('second').get(pk=1)
         for c in connections:
             self.failUnless(len(connections[c].queries) == 1)
-        # test for a regression on the WhereNode, bitbucket #20
-        g1 = Genre.objects.get(Q(title__iexact="A second database"))
 
 
     def test_transactions(self):
@@ -291,7 +291,8 @@ class SingleModelTest(QueryCacheBase):
     def test_basic_querycaching(self):
         """A basic test that querycaching is functioning properly and is
         being invalidated properly on singular table reads & writes."""
-        from testapp.models import Publisher
+        from testapp.models import Publisher, Genre
+        from django.db.models import Q
         connection.queries = []
         starting_count = Publisher.objects.count()
         starting_count = Publisher.objects.count()
@@ -307,6 +308,11 @@ class SingleModelTest(QueryCacheBase):
         # this tests the codepath after 'except EmptyResultSet' where
         # result_type == MULTI
         self.failUnless(not list(Publisher.objects.filter(title__in=[])))
+        # test for a regression on the WhereNode, bitbucket #20
+        g1 = Genre.objects.get(pk=1)
+        g1.title = "Survival Horror"
+        g1.save()
+        g1 = Genre.objects.get(Q(title__iexact="Survival Horror"))
 
     def test_querycache_return_results(self):
         """Test that the return results from the query cache are what we
