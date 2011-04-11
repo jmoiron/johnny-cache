@@ -63,8 +63,10 @@ else:
     #CACHES = { 'default' : { 'BACKEND': 'johnny.backends.locmem.LocMemCache' }}
     CACHES = {
         'default' : {
-            'BACKEND': 'johnny.backends.memcached.MemcachedCache',
+            'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
+            #'BACKEND': 'johnny.backends.memcached.MemcachedCache',
             'LOCATION': ['localhost:11211'],
+            'JOHNNY_CACHE': True,
         }
     }
 

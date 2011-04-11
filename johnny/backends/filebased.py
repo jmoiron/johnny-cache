@@ -1,12 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Infinite file-based caching.  Caches forever when passed timeout of 0.
-
-To use, change your ``CACHE_BACKEND`` setting to something like this::
-
-    CACHE_BACKEND="johnny.backends.filebased:///var/tmp/my_cache_directory"
-"""
+"""Infinite file-based caching.  Caches forever when passed timeout of 0."""
 
 from django.core.cache.backends import filebased
 from django.utils.encoding import smart_str
@@ -27,6 +22,7 @@ class CacheClass(filebased.CacheClass):
             timeout = sys.maxint
         return super(CacheClass, self).set(key, value, timeout)
 
-if django.VERSION[:2] < (1, 3):
+if django.VERSION[:2] > (1, 2):
     class FileBasedCache(CacheClass):
+        """File based cache named according to Django >= 1.3 conventions."""
         pass

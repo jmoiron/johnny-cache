@@ -28,11 +28,16 @@ now lost.  This means on an LRU cache (like memcached, which maintains an
 LRU per slab), you can cache reads forever and the old generations will
 naturally expire out faster than any "live" cache data.
 
-The QuerySet Cache supports Django versions 1.1 and 1.2.
+The QuerySet Cache supports Django versions 1.1, 1.2, and 1.3.
 
 .. autoclass:: johnny.cache.QueryCacheBackend
 
 .. autofunction:: johnny.cache.get_backend
+
+**NOTE**: The usage of ``get_backend`` has changed in Johnny 0.3.  The old
+version returned a class object, but the new version works more as a factory
+that gives you a properly configured QuerySetCache *object* for your Django
+version and current settings.
 
 The main goals of the QuerySet Cache are:
 
@@ -99,8 +104,8 @@ any cache keys to the `LocalStore <'localstore_cache.html'>`_ instead.
 On commit, these keys are pushed to the global cache;  on rollback, they are
 discarded.
 
-Using with TransactionMiddleware
---------------------------------
+Using with TransactionMiddleware (Django 1.2 and earlier)
+---------------------------------------------------------
 
 Django ships with a middleware called 
 ``django.middleware.transaction.TransactionMiddleware``, which wraps all
@@ -112,9 +117,9 @@ This means that if you have views that don't write anything, and also use the
 TransactionMiddleware, you'll never populate the cache with the querysets
 used in those views.
 
-This problem is described in `django ticket #9964`_, but unfortunately fixing
-it isn't straightforward because the "correct" thing to do here is in dispute.
-Starting with version 0.2.1, Johnny includes a middleware called
+This problem is described in `django ticket #9964`_, and has been fixed as
+of Django 1.3.  If you are using a Django version earlier than 1.3 and need
+to use the TransactionMiddleware, Johnny includes a middleware called
 ``johnny.middleware.CommittingTransactionMiddleware``, which is the same as
 the built in version, but always commits transactions on success.  Depending
 on your database, there are still ways to have SELECT statements modify data,
@@ -127,12 +132,17 @@ function much more smoothly.
 Savepoints
 ----------
 
-Preliminary savepoint support is included in version 0.1.  More testing is
-needed (and welcomed).  Currently, the only django backend that has support 
-for Savepoints is the PostgreSQL backend (MySQL's InnoDB engine 
+Johnny supports savepoints, and although it has some comprehensive testing
+for savepoints, it is not entirely certain that they behave the same way
+across the two backends that support them.  Savepoints are tested in single
+and multi-db environments, from both inside and outside the transactions.
+
+Currently, of the backends shipped with Django only the PostgreSQL and 
+Oracle backends support savepoints (MySQL's InnoDB engine
 `supports savepoints <http://dev.mysql.com/doc/refman/5.0/en/savepoint.html>`_, 
-but its backend doesn't).  If you use savepoints, please see the 
-:ref:`manual-invalidation` section.
+but the Django MySQL backend doesn't).  If you use savepoints and are
+encountering invalidation issues, please report a bug and see the 
+:ref:`manual-invalidation` section for possible workarounds.
 
 Usage
 ~~~~~
@@ -159,16 +169,35 @@ Settings
 
 The following settings are available for the QuerySet Cache:
 
+* ``CACHES .. JOHNNY_CACHE``
 * ``DISABLE_QUERYSET_CACHE``
 * ``JOHNNY_MIDDLEWARE_KEY_PREFIX``
 * ``JOHNNY_MIDDLEWARE_SECONDS``
 * ``MAN_IN_BLACKLIST``
-* ``JOHNNY_CACHE_BACKEND``
+
+.. highlight:: python
+
+``CACHES .. JOHNNY_CACHE`` is the preferred way of designating a cache
+as the one used by Johnny.  Generally, it will look something like this::
+
+    CACHES = {
+        # ...
+        'johnny' : {
+            'BACKEND': '...',
+            'JOHNNY_CACHE': True,
+        }
+    }
+
+Johnny *needs* to run on one shared cache pool, so although the behavior is
+defined, a warning will be printed if ``JOHNNY_CACHE`` is found to be ``True``
+in multiple cache definitions.  If ``JOHNNY_CACHE`` is not present, Johnny
+will fall back to the deprecated ``JOHNNY_CACHE_BACKEND`` setting if set,
+and then to the default cache.
 
 ``DISABLE_QUERYSET_CACHE`` will disable the QuerySet cache even if the
-middleware is installed.  This is mostly to make it easy for other modules
-to disable the queryset cache without re-creating the entire middleware
-stack and then removing the QuerySet cache middleware.
+middleware is installed.  This is mostly to make it easy for non-production
+environments to disable the queryset cache without re-creating the entire 
+middleware stack and then removing the QuerySet cache middleware.
 
 ``JOHNNY_MIDDLEWARE_KEY_PREFIX``, default "jc", is to set the prefix for
 Johnny cache.  It's *very important* that if you are running multiple apps
@@ -179,19 +208,29 @@ don't clobber each other in the cache.
 ``JOHNNY_MIDDLEWARE_SECONDS``, default ``0``, is the period that Johnny
 will cache both its generational keys *and* its query cache results.  Since
 the design goal of Johnny was to be able to maintain a consistent cache at
-all times, the default behavior is to cache everything *forever*.  Note that
-if you are not using one of Johnny's `custom backends <backends.html>`_, the 
-default value of ``0`` will work differently on different backends.
+all times, the default behavior is to cache everything *forever*.  If you are 
+not using one of Johnny's `custom backends <backends.html>`_, the default 
+value of ``0`` will work differently on different backends and might cause 
+Johnny to never cache anything.
 
 ``MAN_IN_BLACKLIST`` is a user defined tuple that contains table names to
 exclude from the QuerySet Cache.  If you have no sense of humor, or want your
 settings file to be understandable, you can use the alias
 ``JOHNNY_TABLE_BLACKLIST``.  We just couldn't resist.
 
+*Deprecated*
+------------
+
+* ``JOHNNY_CACHE_BACKEND``
+
 ``JOHNNY_CACHE_BACKEND`` is a cache backend URI similar to what is used by
-Django by default, but only used for Johnny. This allows you to seperate
-the Cache that is used by Johnny from the caching backend of the rest of your
-site.
+Django by default, but only used for Johnny.   In Django 1.2 and earlier, it
+was impossible to define multiple cache backends for Django's core caching
+framework, and this was used to allow separation between the cache that is
+used by Johnny and the caching backend for the rest of your app.
+
+In Django 1.3, this can also take the name of a configured cache, but it is
+recommended to use the ``JOHNNY_CACHE`` cache setting instead.
 
 Signals
 ~~~~~~~

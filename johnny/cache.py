@@ -41,20 +41,26 @@ def blacklist_match(*tables):
     # up with is to pre-create a blacklist set and use intersect.
     return bool(settings.BLACKLIST.intersection(tables))
 
-def get_backend():
-    """Get's a QueryCacheBackend class for the current version of django."""
+def get_backend(cache_backend=None, keyhandler=None, keygen=None):
+    """Get's a QueryCacheBackend object for the given options and current
+    version of django.  If no arguments are given, and a QCB has been
+    created previously, ``get_backend`` returns that.  Otherwise,
+    ``get_backend`` will return the default backend."""
     import django
+    cls = None
     if django.VERSION[:2] == (1, 1):
-        return QueryCacheBackend11
+        cls = QueryCacheBackend11
     if django.VERSION[:2] in ((1, 2), (1, 3)):
-        return QueryCacheBackend
-    raise ImproperlyConfigured("QueryCacheMiddleware cannot patch your version of django.")
+        cls = QueryCacheBackend
+    if cls is None:
+        raise ImproperlyConfigured("Johnny doesn't work on this version of django.")
+    return cls(cache_backend=cache_backend, keyhandler=keyhandler, keygen=keygen)
 
 def invalidate(*tables, **kwargs):
     """Invalidate the current generation for one or more tables.  The arguments
     can be either strings representing database table names or models.  Pass in
-    kwarg 'using' to set the database."""
-    backend = get_backend()()
+    kwarg ``using`` to set the database."""
+    backend = get_backend()
     db = kwargs.get('using', 'default')
     def resolve(x):
         if isinstance(x, basestring):
@@ -259,7 +265,7 @@ class QueryCacheBackend(object):
         if keyhandler: self.kh_class = keyhandler
         if keygen: self.kg_class = keygen
         if not cache_backend and not hasattr(self, 'cache_backend'):
-            from django.core.cache import cache as cache_backend
+            cache_backend = settings._get_backend()
 
         if not keygen and not hasattr(self, 'kg_class'):
             self.kg_class = KeyGen

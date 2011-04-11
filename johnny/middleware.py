@@ -11,17 +11,6 @@ from django.db import transaction
 from johnny import cache, settings
 from django.core import signals
 
-if settings.CACHE_BACKEND:
-    cache_backend = get_cache(settings.CACHE_BACKEND)
-
-    # Some caches -- python-memcached in particular -- need to do a cleanup at the
-    # end of a request cycle. If the cache provides a close() method, wire it up
-    # here.
-    if hasattr(cache_backend, 'close'):
-        signals.request_finished.connect(cache_backend.close)
-else:
-    from django.core.cache import cache as cache_backend
-
 class QueryCacheMiddleware(object):
     """This middleware class monkey-patches django's ORM to maintain
     generational info on each table (model) and to automatically cache all
@@ -36,7 +25,7 @@ class QueryCacheMiddleware(object):
             # when we install, lets refresh the blacklist, just in case johnny
             # was loaded before the setting exists somehow...
             cache.blacklist = settings.BLACKLIST
-            self.query_cache_backend = cache.get_backend()(cache_backend)
+            self.query_cache_backend = cache.get_backend()
             self.query_cache_backend.patch()
             self.installed = True
 

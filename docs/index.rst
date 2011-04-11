@@ -9,7 +9,8 @@ Johnny Cache
 Johnny Cache is a caching framework for django_ applications.  It works with
 the django caching abstraction, but was developed specifically with the use of
 memcached_ in mind.  Its main feature is a patch on Django's ORM that
-automatically caches all reads in a consistent manner.
+automatically caches all reads in a consistent manner.  It works with Django 
+1.1, 1.2, and 1.3.
 
 .. highlight:: sh
 
@@ -40,11 +41,6 @@ Usage
 
 A typical ``settings.py`` file configured for ``johnny-cache``::
     
-    # add johnny to installed apps
-    INSTALLED_APPS = ( 
-        # ...
-        'johnny',
-    )
     # add johnny's middleware
     MIDDLEWARE_CLASSES = (
         'johnny.middleware.LocalStoreClearMiddleware',
@@ -52,13 +48,19 @@ A typical ``settings.py`` file configured for ``johnny-cache``::
         # ... 
     )
     # some johnny settings
-    CACHE_BACKEND = 'johnny.backends.memcached://...'
+    CACHES = {
+        'default' : dict(
+            BACKEND = 'johnny.backends.memcached.MemcachedClass',
+            LOCATION = ['127.0.0.1:11211'],
+            JOHNNY_CACHE = True,
+        )
+    }
     JOHNNY_MIDDLEWARE_KEY_PREFIX='jc_myproj'
 
-Django doesn't *actually* require libraries to be 'installed', and since
-Johnny doesn't define any views, urls, or models, the first step isn't a
-requirement, but we like to make it clear what we're using and where on the
-``PYTHONPATH`` it might be.
+*Note*: The above configuration is for Django 1.3, which radically changed
+its cache configuration.  To see a full inspection of options for earlier
+versions of Django please see the `queryset cache <queryset_cache.html>`_
+docs.
 
 The ``MIDDLEWARE_CLASSES`` setting enables two middlewares:  the outer one
 clears a thread-local dict-like cache located at ``johnny.cache.local`` at
@@ -66,10 +68,9 @@ the end of every request, and should really be the outer most middleware in
 your stack.  The second one enables the main feature of Johnny:  the 
 `queryset cache <queryset_cache.html>`_.
 
-The `custom backend setting <backends.html>`_ enables a thin wrapper around
-Django's ``memcached`` (or ``locmem``) cache class that allows cache times
-of "0", which memcached interprets as "forever" and locmem is patched to 
-see as forever.
+The ``CACHES`` configuration includes a `custom backend <backends.html>`_,
+which allows cache times of "0" to be interpreted as "forever", and marks
+the ``default`` cache backend as the one Johnny will use.
 
 Finally, the project's name is worked into the Johnny key prefix so that if
 other projects are run using the same cache pool, Johnny won't confuse the
@@ -79,26 +80,13 @@ With these settings, all of your ORM queries are now cached.  You should
 read the `queryset cache documentation <queryset_cache.html>`_ closely to
 see if you are doing anything that might require manual invalidation.
 
+Johnny does not define any views, urls, or models, so we can skip adding it
+to ``INSTALLED_APPS``.
+
 New in this version
 ~~~~~~~~~~~~~~~~~~~
 
-* many, many bugfixes
-* fixes for invalidation on queries that contain subselects in WHERE clauses
-* addition of `TransactionCommittingMiddleware <queryset_cache.html#using-with-transactionmiddleware>`_
-* python 2.4 support
-
-Future Django 1.3 Support
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-``johnny-cache`` is currently *not* compatible with Django 1.3b.  Version 0.2.1
-provides cache classes in the vein of the new cache classes for what will be
-Django 1.3, but johnny's transaction support is not functional in 1.3 yet.
-
-After 1.3 final is released, johnny 0.3 will be released, which will fully
-support 1.1-1.3.  If you need to run with 1.3 or django-trunk in the meantime,
-be mindful that Johnny can potentially cache (forever) reads that are done
-within a failing transaction, and please use it only if you are sure that this
-will not impact your application.
+* Django 1.3 support
 
 In Depth Documentation
 ~~~~~~~~~~~~~~~~~~~~~~

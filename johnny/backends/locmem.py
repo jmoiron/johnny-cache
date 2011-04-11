@@ -6,12 +6,7 @@
 This actually doesn't cache "forever", just for a very long time.  On
 32 bit systems, it will cache for 68 years, quite a bit longer than any
 computer will last.  On a 64 bit machine, your cache will expire about
-285 billion years after the Sun goes red-giant and destroys Earth.
-
-To use, change your ``CACHE_BACKEND`` setting to something like this::
-
-    CACHE_BACKEND="johnny.backends.locmem://.."
-"""
+285 billion years after the Sun goes red-giant and destroys Earth."""
 
 from django.core.cache.backends import locmem
 from django.utils.encoding import smart_str
@@ -31,4 +26,6 @@ class CacheClass(locmem.CacheClass):
 
 if django.VERSION[:2] > (1, 2):
     class LocMemCache(CacheClass):
+        """Locmem cache interpreting 0 as "a very long time", named according
+        to the Django 1.3 conventions."""
         pass
