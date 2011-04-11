@@ -273,7 +273,6 @@ class MultiDbTest(TransactionQueryCacheBase):
         transaction.savepoint_rollback(sid, using="default")
         g1 = Genre.objects.using("default").get(pk=1)
 
-        import ipdb; ipdb.set_trace();
         # i think it should be "Rollback Savepoint" here
         self.failUnless(g1.title == start_g1)
 
