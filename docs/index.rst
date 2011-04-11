@@ -88,6 +88,11 @@ New in this version
 
 * Django 1.3 support
 
+The usage for ``johnny.cache.get_backend`` has changed;  it now returns a
+QueryCacheBackend instance rather than the appropriate version of the class.
+Most uses of this function would have been ``get_backend()()``, which can now
+be effectively replaced with ``get_backend()``.
+
 In Depth Documentation
 ~~~~~~~~~~~~~~~~~~~~~~
 

@@ -15,8 +15,7 @@ You can fork johnny-cache `from its hg repository
 
 
 Please read `The full documentation to Johnny Cache
-<http://packages.python.org/johnny-cache/>`_ before using it as there are a few
-edge cases where automatic invalidation was not possible.
+<http://packages.python.org/johnny-cache/>`_ before using it.
 
 .. _django: http://djangoproject.com
 .. _memcached: http://memcached.org
