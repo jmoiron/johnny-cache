@@ -44,8 +44,11 @@ class TransactionQueryCacheBase(base.TransactionJohnnyTestCase):
         super(TransactionQueryCacheBase, self)._pre_setup()
 
     def _post_teardown(self):
+        from django.db import transaction
         _post_teardown(self)
         super(TransactionQueryCacheBase, self)._post_teardown()
+        if transaction.is_managed():
+            transaction.managed(False)
 
 class BlackListTest(QueryCacheBase):
     fixtures = base.johnny_fixtures
@@ -78,6 +81,7 @@ class MultiDbTest(TransactionQueryCacheBase):
             from testapp.models import Genre, Book, Publisher, Person
             from johnny.signals import qc_hit, qc_miss
             from johnny.cache import local
+            from django.db import transaction
             msg = []
             def hit(*args, **kwargs):
                 msg.append(True)
@@ -89,6 +93,13 @@ class MultiDbTest(TransactionQueryCacheBase):
             msg.append(obj)
             queue.put(msg)
         t = Thread(target=_inner, args=(query,))
+        t.start()
+        t.join()
+
+    def _other(self, cmd, q):
+        def _innter(cmd):
+            q.put(eval(cmd))
+        t = Thread(target=_inner, args=(cmd,))
         t.start()
         t.join()
 
@@ -126,7 +137,6 @@ class MultiDbTest(TransactionQueryCacheBase):
         for c in connections:
             self.failUnless(len(connections[c].queries) == 1)
 
-
     def test_transactions(self):
         """Tests transaction rollbacks and local cache for multiple dbs"""
 
@@ -137,19 +147,23 @@ class MultiDbTest(TransactionQueryCacheBase):
             print "\n  Skipping test requiring multiple threads."
             return
         from Queue import Queue as queue
-
         q = queue()
         other = lambda x: self._run_threaded(x, q)
 
         from testapp.models import Genre
         from django.db import connections, transaction
+        from johnny import cache as c
 
+        # sanity check 
+        self.failUnless(transaction.is_managed() == False)
+        self.failUnless(transaction.is_dirty() == False)
         self.failUnless("default" in getattr(settings, "DATABASES"))
         self.failUnless("second" in getattr(settings, "DATABASES"))
 
+        # this should seed this fetch in the global cache
         g1 = Genre.objects.using("default").get(pk=1)
-        start_g1 = g1.title
         g2 = Genre.objects.using("second").get(pk=1)
+        start_g1 = g1.title
 
         transaction.enter_transaction_management(using='default')
         transaction.managed(using='default')
@@ -161,8 +175,8 @@ class MultiDbTest(TransactionQueryCacheBase):
         g1.save()
         g2.save()
 
-        #test outside of transaction, should be cache miss and 
-        #not contain the local changes
+        # test outside of transaction, should be cache hit and 
+        # not contain the local changes
         other("Genre.objects.using('default').get(pk=1)")
         hit, ostart = q.get()
         self.failUnless(ostart.title == start_g1)
@@ -202,21 +216,32 @@ class MultiDbTest(TransactionQueryCacheBase):
 
     def test_savepoints(self):
         """tests savepoints for multiple db's"""
-        if len(getattr(settings, "DATABASES", [])) <= 1:
-            print "\n  Skipping multi database tests"
-            return
-        if settings.DATABASE_ENGINE == 'sqlite3':
-            print "\n  Skipping test requiring multiple threads."
-            return
-
         from Queue import Queue as queue
         q = queue()
         other = lambda x: self._run_threaded(x, q)
 
         from testapp.models import Genre
         from django.db import connections, transaction
+
+        if len(getattr(settings, "DATABASES", [])) <= 1:
+            print "\n  Skipping multi database tests"
+            return
+        for name, db in settings.DATABASES.items():
+            if name in ('default', 'second'):
+                if 'sqlite' in db['ENGINE']:
+                    print "\n  Skipping test requiring multiple threads."
+                    return
+                con = connections[name]
+                if not con.features.uses_savepoints:
+                    print "\n  Skipping test requiring savepoints."
+                    return
+
+        # sanity check 
+        self.failUnless(transaction.is_managed() == False)
+        self.failUnless(transaction.is_dirty() == False)
         self.failUnless("default" in getattr(settings, "DATABASES"))
         self.failUnless("second" in getattr(settings, "DATABASES"))
+
         g1 = Genre.objects.using("default").get(pk=1)
         start_g1 = g1.title
         g2 = Genre.objects.using("second").get(pk=1)
@@ -230,7 +255,7 @@ class MultiDbTest(TransactionQueryCacheBase):
         g1.save()
 
         g2.title = "Committed savepoint"
-        g2.save()
+        g2.save(using="second")
         sid2 = transaction.savepoint(using="second")
 
         sid = transaction.savepoint(using="default")
@@ -248,6 +273,8 @@ class MultiDbTest(TransactionQueryCacheBase):
         transaction.savepoint_rollback(sid, using="default")
         g1 = Genre.objects.using("default").get(pk=1)
 
+        import ipdb; ipdb.set_trace();
+        # i think it should be "Rollback Savepoint" here
         self.failUnless(g1.title == start_g1)
 
         #will be pushed to dirty in commit

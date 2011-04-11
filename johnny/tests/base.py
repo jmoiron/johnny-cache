@@ -34,9 +34,13 @@ def show_johnny_signals(hit=None, miss=None):
             from johnny.signals import qc_hit, qc_miss
             qc_hit.connect(hit)
             qc_miss.connect(miss)
-            ret = func(*args, **kwargs)
-            qc_hit.disconnect(hit)
-            qc_miss.disconnect(miss)
+            try:
+                ret = func(*args, **kwargs)
+            except e:
+                raise
+            finally:
+                qc_hit.disconnect(hit)
+                qc_miss.disconnect(miss)
             return ret
         return wrapped
     return deco

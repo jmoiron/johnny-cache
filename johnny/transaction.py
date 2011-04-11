@@ -79,7 +79,6 @@ class TransactionManager(object):
             if self._uses_savepoints():
                 val = self._get_from_savepoints(key, using)
                 if val: return val
-
         return self.cache_backend.get(key, default)
 
     def _get_from_savepoints(self, key, using=None):
