@@ -33,8 +33,8 @@ def _get_backend():
             # Some caches -- python-memcached in particular -- need to do a cleanup at the
             # end of a request cycle. If the cache provides a close() method, wire it up
             # here.
-            if hasattr(cache_backend, 'close'):
-                signals.request_finished.connect(cache_backend.close)
+            if hasattr(backend, 'close'):
+                signals.request_finished.connect(backend.close)
         return backend
     return cache
 
