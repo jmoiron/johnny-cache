@@ -14,15 +14,15 @@ import django
 import sys
 
 class CacheClass(locmem.CacheClass):
-    def add(self, key, value, timeout=None):
+    def add(self, key, value, timeout=None, **kwargs):
         if timeout is 0:
             timeout = sys.maxint
-        return super(CacheClass, self).add(smart_str(key), value, timeout)
+        return super(CacheClass, self).add(smart_str(key), value, timeout=timeout, **kwargs)
 
-    def set(self, key, value, timeout=None):
+    def set(self, key, value, timeout=None, **kwargs):
         if timeout is 0:
             timeout = sys.maxint
-        return super(CacheClass, self).set(smart_str(key), value, timeout)
+        return super(CacheClass, self).set(smart_str(key), value, timeout=timeout, **kwargs)
 
 if django.VERSION[:2] > (1, 2):
     class LocMemCache(CacheClass):
