@@ -50,7 +50,7 @@ A typical ``settings.py`` file configured for ``johnny-cache``::
     # some johnny settings
     CACHES = {
         'default' : dict(
-            BACKEND = 'johnny.backends.memcached.MemcachedClass',
+            BACKEND = 'johnny.backends.memcached.MemcachedCache',
             LOCATION = ['127.0.0.1:11211'],
             JOHNNY_CACHE = True,
         )
