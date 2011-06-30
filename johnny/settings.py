@@ -6,6 +6,8 @@ BLACKLIST = getattr(settings, 'MAN_IN_BLACKLIST',
             getattr(settings, 'JOHNNY_TABLE_BLACKLIST', []))
 BLACKLIST = set(BLACKLIST)
 
+WHITELIST = set(getattr(settings, 'JOHNNY_TABLE_WHITELIST', []))
+
 MIDDLEWARE_KEY_PREFIX = getattr(settings, 'JOHNNY_MIDDLEWARE_KEY_PREFIX', 'jc')
 
 MIDDLEWARE_SECONDS = getattr(settings, 'JOHNNY_MIDDLEWARE_SECONDS', 0)

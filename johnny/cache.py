@@ -32,14 +32,16 @@ except NameError:
 
 local = localstore.LocalStore()
 
-def blacklist_match(*tables):
-    """Returns True if a set of tables is in the blacklist, False otherwise."""
-    # XXX: When using a blacklist, this has to be done EVERY query;
+def disallowed_table(*tables):
+    """Returns True if a set of tables is in the blacklist or, if a whitelist is set,
+    any of the tables is not in the whitelist. False otherwise."""
+    # XXX: When using a black or white list, this has to be done EVERY query;
     # It'd be nice to make this as fast as possible.  In general, queries
     # should have relatively few tables involved, and I don't imagine that
     # blacklists would grow very vast.  The fastest i've been able to come
     # up with is to pre-create a blacklist set and use intersect.
-    return bool(settings.BLACKLIST.intersection(tables))
+    return not bool(settings.WHITELIST.issuperset(tables)) if settings.WHITELIST\
+        else bool(settings.BLACKLIST.intersection(tables))
 
 def get_backend(cache_backend=None, keyhandler=None, keygen=None):
     """Get's a QueryCacheBackend object for the given options and current
@@ -307,7 +309,7 @@ class QueryCacheBackend(object):
             # check the blacklist for any of the involved tables;  if it's not
             # there, then look for the value in the cache.
             tables = get_tables_for_query(cls.query)
-            if tables and not blacklist_match(*tables):
+            if tables and not disallowed_table(*tables):
                 gen_key = self.keyhandler.get_generation(*tables, **{'db':db})
                 key = self.keyhandler.sql_key(gen_key, sql, params, cls.get_ordering(), result_type, db)
                 val = self.cache_backend.get(key, None, db)
@@ -440,7 +442,7 @@ class QueryCacheBackend11(QueryCacheBackend):
             tables = get_tables_for_query11(cls)
             # check the blacklist for any of the involved tables;  if it's not
             # there, then look for the value in the cache.
-            if tables and not blacklist_match(*tables):
+            if tables and not disallowed_table(*tables):
                 gen_key = self.keyhandler.get_generation(*tables)
                 key = self.keyhandler.sql_key(gen_key, sql, params,
                         cls.ordering_aliases, result_type)
