@@ -18,6 +18,8 @@ def johnny_task_wrapper(f):
         return f
     @wraps(f)
     def newf(*args, **kwargs):
+        backend = get_backend()
+        was_patched = backend._patched
         get_backend().patch()
         #since this function takes all keyword arguments,
         #we will pass only the ones the function below accepts, just as celery does
@@ -29,5 +31,7 @@ def johnny_task_wrapper(f):
             ret = f(*args, **new_kwargs)
         finally:
             local.clear()
+        if not was_patched:
+            get_backend().unpatch()
         return ret
     return newf
