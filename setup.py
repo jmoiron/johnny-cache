@@ -5,7 +5,7 @@ import os
 from setuptools import setup
 #from distutils.core import setup
 
-version = '0.3.2.1'
+version = '0.3.3'
 
 setup(name='johnny-cache',
       version=version,
@@ -31,7 +31,6 @@ setup(name='johnny-cache',
       scripts=[],
       # setuptools specific
       zip_safe=False,
-      install_requires=['django',],
 )
 
 
