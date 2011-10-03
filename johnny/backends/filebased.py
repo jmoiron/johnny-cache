@@ -17,7 +17,7 @@ class CacheClass(filebased.CacheClass):
             timeout = sys.maxint
         return super(CacheClass, self).add(key, value, timeout=timeout, **kwargs)
 
-    def set(self, key, value, timeout=None):
+    def set(self, key, value, timeout=None, **kwargs):
         if timeout is 0:
             timeout = sys.maxint
         return super(CacheClass, self).set(key, value, timeout=timeout, **kwargs)
