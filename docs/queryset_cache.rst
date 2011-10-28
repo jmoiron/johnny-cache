@@ -174,6 +174,7 @@ The following settings are available for the QuerySet Cache:
 * ``JOHNNY_MIDDLEWARE_KEY_PREFIX``
 * ``JOHNNY_MIDDLEWARE_SECONDS``
 * ``MAN_IN_BLACKLIST``
+* ``JOHNNY_DATABASE_MAPPING``
 
 .. highlight:: python
 
@@ -217,6 +218,16 @@ Johnny to never cache anything.
 exclude from the QuerySet Cache.  If you have no sense of humor, or want your
 settings file to be understandable, you can use the alias
 ``JOHNNY_TABLE_BLACKLIST``.  We just couldn't resist.
+
+``JOHNNY_DATABASE_MAPPING`` is a user defined dictionary that maps database
+names to one another.  The primary use for ``JOHNNY_DATABASE_MAPPING`` is to
+assure master/slave setups that using a django router all point to the same
+cache keys.  For a typical default/slave setup this will do the job:
+
+	JOHNNY_DATABASE_MAPPING = { 
+		'slave': 'default', 
+	}
+
 
 *Deprecated*
 ------------
