@@ -15,7 +15,7 @@ CACHE_BACKEND = getattr(settings, 'JOHNNY_CACHE_BACKEND',
 
 CACHES = getattr(settings, 'CACHES', {})
 
-DATABASE_MAPPING = getattr(settings, "JOHNNY_DATABASE_MAPPING", [])
+DATABASE_MAPPING = getattr(settings, "JOHNNY_DATABASE_MAPPING", {})
 
 def _get_backend():
     """Returns the actual django cache object johnny is configured to use.
