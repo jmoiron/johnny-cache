@@ -153,6 +153,8 @@ class KeyGen(object):
         """Returns a key that is standard for a given table name and database alias.
         Total length up to 212 (max for memcache is 250)."""
         table = unicode(table)
+        if db in settings.DATABASE_MAPPING:
+            db = settings.DATABASE_MAPPING[db]
         db = unicode(db)
         if len(table) > 100:
             table = table[0:68] + self.gen_key(table[68:])
@@ -162,6 +164,8 @@ class KeyGen(object):
 
     def gen_multi_key(self, values, db='default'):
         """Takes a list of generations (not table keys) and returns a key."""
+        if db in settings.DATABASE_MAPPING:
+            db = settings.DATABASE_MAPPING[db]
         if db and len(db) > 100:
             db = db[0:68] + self.gen_key(db[68:])
         return '%s_%s_multi_%s' % (self.prefix, db, self.gen_key(*values))
@@ -238,6 +242,9 @@ class KeyHandler(object):
     def sql_key(self, generation, sql, params, order, result_type, using='default'):
         """Return the specific cache key for the sql query described by the
         pieces of the query and the generation key."""
+        if using in settings.DATABASE_MAPPING:
+            using = settings.DATABASE_MAPPING[using]
+
         # these keys will always look pretty opaque
         key = '%s_%s_query_%s.%s' % (self.prefix, using, generation, self.keygen.gen_key(sql, params,
                 order, result_type))
@@ -281,6 +288,8 @@ class QueryCacheBackend(object):
         from django.db.models.sql import compiler
         from django.db.models.sql.constants import MULTI
         from django.db.models.sql.datastructures import EmptyResultSet
+
+
 
         @wraps(original)
         def newfun(cls, *args, **kwargs):
