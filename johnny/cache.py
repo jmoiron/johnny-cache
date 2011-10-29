@@ -76,7 +76,7 @@ def get_tables_for_query(query):
     with their own dependent queries, etc."""
     from django.db.models.sql.where import WhereNode
     from django.db.models.query import QuerySet
-    tables = list(query.tables) or getattr(query, 'table_map', {}).keys()
+    tables = [v[0] for v in getattr(query,'alias_map',{}).values()]
 
     def get_tables(where_node, tables):
         for child in where_node.children:
