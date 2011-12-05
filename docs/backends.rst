@@ -24,4 +24,8 @@ filebased
 .. automodule:: johnny.backends.filebased
 .. autoclass:: johnny.backends.filebased.FileBasedCache
 
+redis
+~~~~~
 
+.. automodule:: johnny.backends.redis
+.. autoclass:: johnny.backends.redis.RedisCache
