@@ -65,7 +65,7 @@ class TransactionManager(object):
             del self.local['trans_sids']
 
     def has_multi_db(self):
-        if django.VERSION[:2] in ((1, 2), (1, 3)):
+        if django.VERSION[:2] > (1, 1):
             return True
         return False
 
@@ -152,9 +152,9 @@ class TransactionManager(object):
             original()
             self._flush(commit=commit)
 
-        if django.VERSION[:2] == (1,1):
+        if django.VERSION[:2] == (1, 1):
             return newfun11
-        elif django.VERSION[:2] in ((1,2), (1,3)):
+        elif django.VERSION[:2] > (1, 1):
             return newfun
         return original
 

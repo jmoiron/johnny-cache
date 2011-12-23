@@ -3,6 +3,7 @@
 
 """Tests for the QueryCache functionality of johnny."""
 
+import django
 from django.conf import settings
 from django.db import connection
 from johnny import middleware
@@ -624,9 +625,15 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         from django.db import transaction
         from testapp.models import Genre, Publisher
         from johnny import cache
-        if settings.DATABASE_ENGINE == 'sqlite3':
-            print "\n  Skipping test requiring multiple threads."
-            return
+
+        if django.VERSION[:2] < (1, 3):
+            if settings.DATABASE_ENGINE == 'sqlite3':
+                print "\n  Skipping test requiring multiple threads."
+                return
+        else:
+            if settings.DATABASES.get('default', {}).get('ENGINE', '').endswith('sqlite3'):
+                print "\n  Skipping test requiring multiple threads."
+                return
 
         self.failUnless(transaction.is_managed() == False)
         self.failUnless(transaction.is_dirty() == False)
@@ -675,9 +682,14 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         from django.db import transaction
         from testapp.models import Genre, Publisher
         from johnny import cache
-        if settings.DATABASE_ENGINE == 'sqlite3':
-            print "\n  Skipping test requiring multiple threads."
-            return
+        if django.VERSION[:2] < (1, 3):
+            if settings.DATABASE_ENGINE == 'sqlite3':
+                print "\n  Skipping test requiring multiple threads."
+                return
+        else:
+            if settings.DATABASES.get('default', {}).get('ENGINE', '').endswith('sqlite3'):
+                print "\n  Skipping test requiring multiple threads."
+                return
 
         self.failUnless(transaction.is_managed() == False)
         self.failUnless(transaction.is_dirty() == False)

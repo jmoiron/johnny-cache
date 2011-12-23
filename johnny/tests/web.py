@@ -42,7 +42,7 @@ class TestTransactionMiddleware(base.TransactionJohnnyWebTestCase):
         """Verify that doing the same request w/o a db write twice does not
         populate the cache properly."""
         # it seems that django 1.3 doesn't exhibit this bug!
-        if django.VERSION[:2] == (1, 3):
+        if django.VERSION[:2] >= (1, 3):
             return
         connection.queries = []
         q = base.message_queue()

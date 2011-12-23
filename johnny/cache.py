@@ -50,7 +50,7 @@ def get_backend(cache_backend=None, keyhandler=None, keygen=None):
     cls = None
     if django.VERSION[:2] == (1, 1):
         cls = QueryCacheBackend11
-    if django.VERSION[:2] in ((1, 2), (1, 3)):
+    if django.VERSION[:2] > (1, 1):
         cls = QueryCacheBackend
     if cls is None:
         raise ImproperlyConfigured("Johnny doesn't work on this version of django.")
