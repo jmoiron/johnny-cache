@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 """Defined signals for johnny-cache."""
 
 from django.dispatch import Signal

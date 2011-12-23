@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
+import django
 from django.db import transaction as django_transaction
 from django.db import connection
 try:
@@ -14,20 +12,19 @@ except ImportError:
     from django.utils.functional import wraps  # Python 2.3, 2.4 fallback.
 
 
-import django
-
-
 class TransactionManager(object):
-    """TransactionManager is a wrapper around a cache_backend that is
+    """
+    TransactionManager is a wrapper around a cache_backend that is
     transaction aware.
 
     If we are in a transaction, it will return the locally cached version.
 
       * On rollback, it will flush all local caches
-      * On commit, it will push them up to the real shared cache backend 
+      * On commit, it will push them up to the real shared cache backend
         (ex. memcached).
     """
     _patched_var = False
+
     def __init__(self, cache_backend, keygen):
         from johnny import cache, settings
 
@@ -75,10 +72,12 @@ class TransactionManager(object):
     def get(self, key, default=None, using=None):
         if self.is_managed() and self._patched_var:
             val = self.local.get(key, None)
-            if val: return val
+            if val:
+                return val
             if self._uses_savepoints():
                 val = self._get_from_savepoints(key, using)
-                if val: return val
+                if val:
+                    return val
         return self.cache_backend.get(key, default)
 
     def _get_from_savepoints(self, key, using=None):
@@ -115,22 +114,24 @@ class TransactionManager(object):
 
     def _clear(self, using=None):
         if self.has_multi_db():
-            self.local.clear('%s_%s_*'%(self.prefix, self._trunc_using(using)))
+            self.local.clear('%s_%s_*' %
+                             (self.prefix, self._trunc_using(using)))
         else:
-            self.local.clear('%s_*'%self.prefix)
+            self.local.clear('%s_*' % self.prefix)
 
     def _flush(self, commit=True, using=None):
         """
         Flushes the internal cache, either to the memcache or rolls back
         """
         if commit:
-            # XXX: multi-set? 
+            # XXX: multi-set?
             if self._uses_savepoints():
                 self._commit_all_savepoints(using)
             if self.has_multi_db():
-                c = self.local.mget('%s_%s_*'%(self.prefix, self._trunc_using(using)))
+                c = self.local.mget('%s_%s_*' %
+                                    (self.prefix, self._trunc_using(using)))
             else:
-                c = self.local.mget('%s_*'%self.prefix)
+                c = self.local.mget('%s_*' % self.prefix)
             for key, value in c.iteritems():
                 self.cache_backend.set(key, value, self.timeout)
         else:
@@ -163,17 +164,18 @@ class TransactionManager(object):
 
     def _sid_key(self, sid, using=None):
         if using != None:
-            return 'trans_savepoint_%s_%s'%(using, sid)
-        return 'trans_savepoint_%s'%sid
+            return 'trans_savepoint_%s_%s' % (using, sid)
+        return 'trans_savepoint_%s' % sid
 
     def _create_savepoint(self, sid, using=None):
         key = self._sid_key(sid, using)
 
         #get all local dirty items
         if self.has_multi_db():
-            c = self.local.mget('%s_%s_*'%(self.prefix, self._trunc_using(using)))
+            c = self.local.mget('%s_%s_*' %
+                                (self.prefix, self._trunc_using(using)))
         else:
-            c = self.local.mget('%s_*'%self.prefix)
+            c = self.local.mget('%s_*' % self.prefix)
         #store them to a dictionary in the localstore
         if key not in self.local:
             self.local[key] = {}
@@ -199,14 +201,14 @@ class TransactionManager(object):
                 del self.local[i]
             #clear dirty
             self._clear(using)
-        except IndexError, e:
+        except IndexError:
             #key not found, don't delete from localstore, restore sid stack
             for i in stack:
                 sids.insert(0, i)
 
     def _commit_savepoint(self, sid, using=None):
-        #commit is not a commit but is in reality just a clear back to that savepoint
-        #and adds the items back to the dirty transaction.
+        # commit is not a commit but is in reality just a clear back to that
+        # savepoint and adds the items back to the dirty transaction.
         key = self._sid_key(sid, using)
         sids = self._get_sid(using)
         stack = []
@@ -221,7 +223,7 @@ class TransactionManager(object):
                     self.local[k] = v
                 del self.local[i]
             self._restore_dirty(using)
-        except IndexError, e:
+        except IndexError:
             for i in stack:
                 sids.insert(0, i)
 
@@ -237,17 +239,18 @@ class TransactionManager(object):
 
     def _store_dirty(self, using=None):
         if self.has_multi_db():
-            c = self.local.mget('%s_%s_*'%(self.prefix, self._trunc_using(using)))
+            c = self.local.mget('%s_%s_*' %
+                                (self.prefix, self._trunc_using(using)))
         else:
-            c = self.local.mget('%s_*'%self.prefix)
-        backup = 'trans_dirty_store_%s'%self._trunc_using(using)
+            c = self.local.mget('%s_*' % self.prefix)
+        backup = 'trans_dirty_store_%s' % self._trunc_using(using)
         self.local[backup] = {}
         for k, v in c.iteritems():
             self.local[backup][k] = v
         self._clear(using)
 
     def _restore_dirty(self, using=None):
-        backup = 'trans_dirty_store_%s'%self._trunc_using(using)
+        backup = 'trans_dirty_store_%s' % self._trunc_using(using)
         for k, v in self.local.get(backup, {}).iteritems():
             self.local[k] = v
         del self.local[backup]
@@ -293,8 +296,8 @@ class TransactionManager(object):
     def patch(self):
         """
         This function monkey patches commit and rollback
-        writes to the cache should not happen until commit (unless our state isn't managed).
-        It does not yet support savepoints.
+        writes to the cache should not happen until commit (unless our state
+        isn't managed). It does not yet support savepoints.
         """
         if not self._patched_var:
             self._originals['rollback'] = self._getreal('rollback')
@@ -314,5 +317,3 @@ class TransactionManager(object):
         for fun in self._originals:
             setattr(django_transaction, fun, self._originals[fun])
         self._patched_var = False
-
-

@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 """
 Johnny provides a number of backends, all of which are subclassed versions of
 django builtins that cache "forever" when passed a 0 timeout. These are
@@ -27,11 +24,10 @@ Example usage for various Django versions::
         }
     }
 
-**Important Note**:  The ``locmem`` and ``filebased`` caches are NOT recommended
-for setups in which there is more than one server using Johnny; invalidation
-will break with potentially disasterous results if the cache Johnny uses is not
-shared amongst all machines writing to the database.
+**Important Note**:  The ``locmem`` and ``filebased`` caches are NOT
+recommended for setups in which there is more than one server using Johnny;
+invalidation will break with potentially disasterous results if the cache
+Johnny uses is not shared amongst all machines writing to the database.
 """
 
 __all__ = ['memcached', 'locmem', 'filebased']
-

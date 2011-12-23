@@ -1,16 +1,13 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 """Johnny's main caching functionality."""
 
-import sys
 import re
+import time
+from uuid import uuid4
 
 try:
     from functools import wraps
 except ImportError:
     from django.utils.functional import wraps  # Python 2.3, 2.4 fallback.
-from uuid import uuid4
 try:
     from hashlib import md5
 except ImportError:
@@ -20,17 +17,23 @@ import localstore
 import signals
 from johnny import settings
 from transaction import TransactionManager
+
+import django
 from django.core.exceptions import ImproperlyConfigured
+from django.db.models.signals import post_save, post_delete
 
 try:
     any
 except NameError:
+
     def any(iterable):
         for i in iterable:
-            if i: return True
+            if i:
+                return True
         return False
 
 local = localstore.LocalStore()
+
 
 def blacklist_match(*tables):
     """Returns True if a set of tables is in the blacklist, False otherwise."""
@@ -41,20 +44,23 @@ def blacklist_match(*tables):
     # up with is to pre-create a blacklist set and use intersect.
     return bool(settings.BLACKLIST.intersection(tables))
 
-def get_backend(cache_backend=None, keyhandler=None, keygen=None):
-    """Get's a QueryCacheBackend object for the given options and current
+
+def get_backend(**kwargs):
+    """
+    Get's a QueryCacheBackend object for the given options and current
     version of django.  If no arguments are given, and a QCB has been
     created previously, ``get_backend`` returns that.  Otherwise,
-    ``get_backend`` will return the default backend."""
-    import django
-    cls = None
+    ``get_backend`` will return the default backend.
+    """
     if django.VERSION[:2] == (1, 1):
         cls = QueryCacheBackend11
-    if django.VERSION[:2] > (1, 1):
+    elif django.VERSION[:2] > (1, 1):
         cls = QueryCacheBackend
-    if cls is None:
-        raise ImproperlyConfigured("Johnny doesn't work on this version of django.")
-    return cls(cache_backend=cache_backend, keyhandler=keyhandler, keygen=keygen)
+    else:
+        raise ImproperlyConfigured(
+            "Johnny doesn't work on this version of Django.")
+    return cls(**kwargs)
+
 
 def invalidate(*tables, **kwargs):
     """Invalidate the current generation for one or more tables.  The arguments
@@ -62,25 +68,30 @@ def invalidate(*tables, **kwargs):
     kwarg ``using`` to set the database."""
     backend = get_backend()
     db = kwargs.get('using', 'default')
+
     def resolve(x):
         if isinstance(x, basestring):
             return x
         return x._meta.db_table
+
     if backend._patched:
         for t in map(resolve, tables):
             backend.keyhandler.invalidate_table(t, db)
 
+
 def get_tables_for_query(query):
-    """Takes a Django 'query' object and returns all tables that will be used in
-    that query as a list.  Note that where clauses can have their own querysets
-    with their own dependent queries, etc."""
+    """
+    Takes a Django 'query' object and returns all tables that will be used in
+    that query as a list.  Note that where clauses can have their own
+    querysets with their own dependent queries, etc.
+    """
     from django.db.models.sql.where import WhereNode
     from django.db.models.query import QuerySet
     tables = list(query.tables) or getattr(query, 'table_map', {}).keys()
 
     def get_tables(where_node, tables):
         for child in where_node.children:
-            if isinstance(child, WhereNode):# and child.children:
+            if isinstance(child, WhereNode):  # and child.children:
                 tables = get_tables(child, tables)
                 continue
             for item in child:
@@ -88,22 +99,28 @@ def get_tables_for_query(query):
                     tables += get_tables_for_query(item.query)
         return tables
 
-    if query.where and query.where.children and isinstance(query.where.children[0], WhereNode):
+    if (query.where and query.where.children and
+            isinstance(query.where.children[0], WhereNode)):
         where_node = query.where.children[0]
         tables = get_tables(where_node, tables)
 
     return list(set(tables))
 
+
 def get_tables_for_query11(query):
-    """Takes a django BaseQuery object and tries to return all tables that will
+    """
+    Takes a django BaseQuery object and tries to return all tables that will
     be used in that query as a list.  Unfortunately, the where clauses give us
     "QueryWrapper" instead of "QuerySet" objects, so we have to parse SQL once
     we get down to a certain layer to get the tables we are using.  This is
-    meant for use in Django 1.1.x only!  Later versions can use the above."""
+    meant for use in Django 1.1.x only!  Later versions can use the above.
+    """
     from django.db.models.sql.where import WhereNode
     from django.db.models.query_utils import QueryWrapper
+
     def parse_tables_from_sql(sql):
-        """This attempts to parse tables out of sql.  Django's SQL compiler is
+        """
+        This attempts to parse tables out of sql.  Django's SQL compiler is
         highly regular and always uses extended SQL forms like 'INNER JOIN'
         instead of ','.  This probably needs a lot of testing for different
         backends and is not guaranteed to work on a custom backend."""
@@ -111,7 +128,8 @@ def get_tables_for_query11(query):
         return table_re.findall(sql)
 
     tables = list(query.tables)
-    if query.where and query.where.children and isinstance(query.where.children[0], WhereNode):
+    if (query.where and query.where.children and
+            isinstance(query.where.children[0], WhereNode)):
         where_node = query.where.children[0]
         for child in where_node.children:
             if isinstance(child, WhereNode):
@@ -121,19 +139,20 @@ def get_tables_for_query11(query):
                     tables += parse_tables_from_sql(item.data[0])
     return list(set(tables))
 
-from functools import wraps
 
 def timer(func):
-    import time
     times = []
+
     @wraps(func)
     def foo(*args, **kwargs):
         t0 = time.time()
         ret = func(*args, **kwargs)
         times.append(time.time() - t0)
-        print "%d runs, %0.6f avg" % (len(times), sum(times)/float(len(times)))
+        print ("%d runs, %0.6f avg" %
+               (len(times), sum(times) / float(len(times))))
         return ret
     return foo
+
 
 # The KeyGen is used only to generate keys.  Some of these keys will be used
 # directly in the cache, while others are only general purpose functions to
@@ -150,8 +169,10 @@ class KeyGen(object):
         return self.gen_key(str(uuid4()))
 
     def gen_table_key(self, table, db='default'):
-        """Returns a key that is standard for a given table name and database alias.
-        Total length up to 212 (max for memcache is 250)."""
+        """
+        Returns a key that is standard for a given table name and database
+        alias. Total length up to 212 (max for memcache is 250).
+        """
         table = unicode(table)
         db = unicode(db)
         if len(table) > 100:
@@ -185,6 +206,7 @@ class KeyGen(object):
         key = md5()
         KeyGen._recursive_convert(values, key)
         return key.hexdigest()
+
 
 class KeyHandler(object):
     """Handles pulling and invalidating the key from from the cache based
@@ -235,19 +257,22 @@ class KeyHandler(object):
         self.cache_backend.set(key, val, 0, db)
         return val
 
-    def sql_key(self, generation, sql, params, order, result_type, using='default'):
-        """Return the specific cache key for the sql query described by the
-        pieces of the query and the generation key."""
+    def sql_key(self, generation, sql, params, order, result_type,
+                using='default'):
+        """
+        Return the specific cache key for the sql query described by the
+        pieces of the query and the generation key.
+        """
         # these keys will always look pretty opaque
-        key = '%s_%s_query_%s.%s' % (self.prefix, using, generation, self.keygen.gen_key(sql, params,
-                order, result_type))
-        return key
+        suffix = self.keygen.gen_key(sql, params, order, result_type)
+        return '%s_%s_query_%s.%s' % (self.prefix, using, generation, suffix)
 
-# TODO: This QueryCacheBackend is for 1.2;  we need to write one for 1.1 as well
+
+# TODO: This QueryCacheBackend is for 1.2;  we need to write one for 1.1 as
+# well
 # we can test them out by using different virtualenvs pretty quickly
 
 # XXX: Thread safety concerns?  Should we only need to patch once per process?
-
 class QueryCacheBackend(object):
     """This class is the engine behind the query cache. It reads the queries
     going through the django Query and returns from the cache using
@@ -259,11 +284,14 @@ class QueryCacheBackend(object):
     call ``johnny.cache.get_backend`` to automatically get the proper class.
     """
     __shared_state = {}
+
     def __init__(self, cache_backend=None, keyhandler=None, keygen=None):
         self.__dict__ = self.__shared_state
         self.prefix = settings.MIDDLEWARE_KEY_PREFIX
-        if keyhandler: self.kh_class = keyhandler
-        if keygen: self.kg_class = keygen
+        if keyhandler:
+            self.kh_class = keyhandler
+        if keygen:
+            self.kg_class = keygen
         if not cache_backend and not hasattr(self, 'cache_backend'):
             cache_backend = settings._get_backend()
 
@@ -273,8 +301,10 @@ class QueryCacheBackend(object):
             self.kh_class = KeyHandler
 
         if cache_backend:
-            self.cache_backend = TransactionManager(cache_backend, self.kg_class)
-            self.keyhandler = self.kh_class(self.cache_backend, self.kg_class, self.prefix)
+            self.cache_backend = TransactionManager(cache_backend,
+                                                    self.kg_class)
+            self.keyhandler = self.kh_class(self.cache_backend,
+                                            self.kg_class, self.prefix)
         self._patched = getattr(self, '_patched', False)
 
     def _monkey_select(self, original):
@@ -308,8 +338,11 @@ class QueryCacheBackend(object):
             # there, then look for the value in the cache.
             tables = get_tables_for_query(cls.query)
             if tables and not blacklist_match(*tables):
-                gen_key = self.keyhandler.get_generation(*tables, **{'db':db})
-                key = self.keyhandler.sql_key(gen_key, sql, params, cls.get_ordering(), result_type, db)
+                gen_key = self.keyhandler.get_generation(*tables,
+                                                         **{'db': db})
+                key = self.keyhandler.sql_key(gen_key, sql, params,
+                                              cls.get_ordering(),
+                                              result_type, db)
                 val = self.cache_backend.get(key, None, db)
 
             if val is not None:
@@ -330,7 +363,8 @@ class QueryCacheBackend(object):
                 #no longer lazy...
                 #todo - create a smart iterable wrapper
                 val = list(val)
-            if key is not None: self.cache_backend.set(key, val, 0, db)
+            if key is not None:
+                self.cache_backend.set(key, val, 0, db)
             return val
         return newfun
 
@@ -354,9 +388,10 @@ class QueryCacheBackend(object):
             return ret
         return newfun
 
-
     def patch(self):
-        """monkey patches django.db.models.sql.compiler.SQL*Compiler series"""
+        """
+        monkey patches django.db.models.sql.compiler.SQL*Compiler series
+        """
         from django.db.models.sql import compiler
 
         self._read_compilers = (
@@ -370,7 +405,6 @@ class QueryCacheBackend(object):
             compiler.SQLUpdateCompiler,
         )
         if not self._patched:
-            from django.db.models.sql import compiler
             self._original = {}
             for reader in self._read_compilers:
                 self._original[reader] = reader.execute_sql
@@ -386,7 +420,6 @@ class QueryCacheBackend(object):
         """un-applies this patch."""
         if not self._patched:
             return
-        from django.db.models.sql import compiler
         for func in self._read_compilers + self._write_compilers:
             func.execute_sql = self._original[func]
         self.cache_backend.unpatch()
@@ -395,17 +428,16 @@ class QueryCacheBackend(object):
     def invalidate_m2m(self, instance, **kwargs):
         if self._patched:
             self.keyhandler.invalidate_table(instance)
+
     def invalidate(self, instance, **kwargs):
         if self._patched:
             self.keyhandler.invalidate_table(instance._meta.db_table)
 
     def _handle_signals(self):
-        from django.db.models import signals
-        signals.post_save.connect(self.invalidate, sender=None)
-        signals.post_delete.connect(self.invalidate, sender=None)
+        post_save.connect(self.invalidate, sender=None)
+        post_delete.connect(self.invalidate, sender=None)
         # FIXME: only needed in 1.1?
-        import signals as johnny_signals
-        johnny_signals.qc_m2m_change.connect(self.invalidate_m2m, sender=None)
+        signals.qc_m2m_change.connect(self.invalidate_m2m, sender=None)
 
     def flush_query_cache(self):
         from django.db import connection
@@ -414,14 +446,18 @@ class QueryCacheBackend(object):
         for table in tables:
             self.keyhandler.invalidate_table(table)
 
+
 class QueryCacheBackend11(QueryCacheBackend):
-    """This is the 1.1.x version of the QueryCacheBackend.  In Django1.1, we
+    """
+    This is the 1.1.x version of the QueryCacheBackend.  In Django1.1, we
     patch django.db.models.sql.query.Query.execute_sql to implement query
-    caching.  Usage across QueryCacheBackends is identical."""
+    caching.  Usage across QueryCacheBackends is identical.
+    """
     __shared_state = {}
+
     def _monkey_execute_sql(self, original):
         from django.db.models.sql import query
-        from django.db.models.sql.constants import MULTI, SINGLE
+        from django.db.models.sql.constants import MULTI
         from django.db.models.sql.datastructures import EmptyResultSet
 
         @wraps(original)
@@ -454,8 +490,10 @@ class QueryCacheBackend11(QueryCacheBackend):
 
             # we didn't find the value in the cache, so execute the query
             result = original(cls, result_type)
-            if tables and not sql.startswith('UPDATE') and not sql.startswith('DELETE'):
-                # I think we should always be sending a signal here if we miss..
+            if (tables and not sql.startswith('UPDATE') and
+                    not sql.startswith('DELETE')):
+                # I think we should always be sending a signal here if we
+                # miss..
                 signals.qc_miss.send(sender=cls, tables=tables,
                         query=(sql, params, cls.ordering_aliases),
                         key=key)
@@ -479,8 +517,10 @@ class QueryCacheBackend11(QueryCacheBackend):
             return
         self._original = sql.Query.execute_sql
         self._original_m2m = related.create_many_related_manager
-        sql.Query.execute_sql = self._monkey_execute_sql(sql.Query.execute_sql)
-        related.create_many_related_manager = self._patched_m2m(related.create_many_related_manager)
+        sql.Query.execute_sql = self._monkey_execute_sql(
+            sql.Query.execute_sql)
+        related.create_many_related_manager = self._patched_m2m(
+            related.create_many_related_manager)
         self._handle_signals()
         self.cache_backend.patch()
         self._patched = True
@@ -496,7 +536,8 @@ class QueryCacheBackend11(QueryCacheBackend):
     def _patched_m2m_func(self, original):
         def f(cls, *args, **kwargs):
             val = original(cls, *args, **kwargs)
-            signals.qc_m2m_change.send(sender=cls, instance=cls.join_table.strip('"').strip('`'))
+            signals.qc_m2m_change.send(
+                sender=cls, instance=cls.join_table.strip('"').strip('`'))
             return val
         return f
 
@@ -506,10 +547,9 @@ class QueryCacheBackend11(QueryCacheBackend):
             if getattr(related_manager, '_johnny_patched', None):
                 return related_manager
             for i in ('add', 'remove', 'clear'):
-                item = '_%s_items'%i
+                item = '_%s_items' % i
                 setattr(related_manager, item,
-                        self._patched_m2m_func(getattr(related_manager, item))
-                       )
+                        self._patched_m2m_func(getattr(related_manager, item)))
             related_manager._johnny_patched = True
             return related_manager
         return f

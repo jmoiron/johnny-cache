@@ -3,20 +3,20 @@
 
 """Middleware classes for johnny cache."""
 
-import django
-from django.core.exceptions import ImproperlyConfigured
-from django.core.cache import get_cache
 from django.middleware import transaction as trans_middleware
 from django.db import transaction
 from johnny import cache, settings
-from django.core import signals
+
 
 class QueryCacheMiddleware(object):
-    """This middleware class monkey-patches django's ORM to maintain
+    """
+    This middleware class monkey-patches django's ORM to maintain
     generational info on each table (model) and to automatically cache all
     querysets created via the ORM.  This should be the first middleware
-    in your middleware stack."""
-    __state = {} # alex martinelli's borg pattern
+    in your middleware stack.
+    """
+    __state = {}  # Alex Martinelli's borg pattern
+
     def __init__(self):
         self.__dict__ = self.__state
         self.disabled = settings.DISABLE_QUERYSET_CACHE
@@ -34,9 +34,12 @@ class QueryCacheMiddleware(object):
         self.query_cache_backend.flush_query_cache()
         self.installed = False
 
+
 class LocalStoreClearMiddleware(object):
-    """This middleware clears the localstore cache in `johnny.cache.local`
-    at the end of every request."""
+    """
+    This middleware clears the localstore cache in `johnny.cache.local`
+    at the end of every request.
+    """
     def process_exception(self, *args, **kwargs):
         cache.local.clear()
         raise
@@ -45,13 +48,17 @@ class LocalStoreClearMiddleware(object):
         cache.local.clear()
         return resp
 
+
 class CommittingTransactionMiddleware(trans_middleware.TransactionMiddleware):
-    """A version of the built in TransactionMiddleware that always commits its
-    transactions, even if they aren't dirty."""
+    """
+    A version of the built in TransactionMiddleware that always commits its
+    transactions, even if they aren't dirty.
+    """
     def process_response(self, request, response):
         if transaction.is_managed():
-            try: transaction.commit()
-            except: pass
+            try:
+                transaction.commit()
+            except:
+                pass
             transaction.leave_transaction_management()
         return response
-

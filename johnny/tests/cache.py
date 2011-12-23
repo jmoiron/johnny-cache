@@ -473,7 +473,7 @@ class MultiModelTest(QueryCacheBase):
         after_save = len(connection.queries)
         books = list(Book.objects.select_related('publisher'))
         self.failUnless(len(connection.queries) == after_save + 1)
-        # the query should be cached again... 
+        # the query should be cached again...
         books = list(Book.objects.select_related('publisher'))
         # this time, create a book and the query should again be uncached..
         Book(title='Anna Karenina', slug='anna-karenina', publisher=p).save()
