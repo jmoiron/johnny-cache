@@ -15,7 +15,7 @@ class QueryCacheMiddleware(object):
     querysets created via the ORM.  This should be the first middleware
     in your middleware stack.
     """
-    __state = {}  # Alex Martinelli's borg pattern
+    __state = {}  # Alex Martelli's borg pattern
 
     def __init__(self):
         self.__dict__ = self.__state
