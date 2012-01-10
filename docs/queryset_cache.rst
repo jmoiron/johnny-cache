@@ -176,7 +176,6 @@ The following settings are available for the QuerySet Cache:
 * ``JOHNNY_MIDDLEWARE_SECONDS``
 * ``MAN_IN_BLACKLIST``
 
-
 .. highlight:: python
 
 ``CACHES .. JOHNNY_CACHE`` is the preferred way of designating a cache

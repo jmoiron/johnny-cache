@@ -174,7 +174,7 @@ class KeyGen(object):
         alias. Total length up to 212 (max for memcache is 250).
         """
         table = unicode(table)
-        db = settings.DB_CACHE_KEYS[db]
+        db = unicode(settings.DB_CACHE_KEYS[db])
         if len(table) > 100:
             table = table[0:68] + self.gen_key(table[68:])
         if db and len(db) > 100:
