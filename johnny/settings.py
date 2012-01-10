@@ -9,6 +9,9 @@ BLACKLIST = getattr(settings, 'MAN_IN_BLACKLIST',
             getattr(settings, 'JOHNNY_TABLE_BLACKLIST', []))
 BLACKLIST = set(BLACKLIST)
 
+DB_CACHE_KEYS = dict((name, unicode(db.get('JOHNNY_CACHE_KEY', name)))
+                     for name, db in settings.DATABASES.iteritems())
+
 MIDDLEWARE_KEY_PREFIX = getattr(settings, 'JOHNNY_MIDDLEWARE_KEY_PREFIX', 'jc')
 
 MIDDLEWARE_SECONDS = getattr(settings, 'JOHNNY_MIDDLEWARE_SECONDS', 0)
