@@ -222,7 +222,11 @@ class MultiDbTest(TransactionQueryCacheBase):
         other = lambda x: self._run_threaded(x, q)
 
         from testapp.models import Genre
-        from django.db import connections, transaction
+        try:
+            from django.db import connections, transaction
+        except ImportError:
+            # connections doesn't exist in 1.1 and under
+            print"\n  Skipping multi database tests"
 
         if len(getattr(settings, "DATABASES", [])) <= 1:
             print "\n  Skipping multi database tests"
