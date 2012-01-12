@@ -151,7 +151,7 @@ class MultiDbTest(TransactionQueryCacheBase):
         self.failUnless("second" in getattr(settings, "DATABASES"))
 
         old_cache_keys = johnny_settings.DB_CACHE_KEYS
-        johnny_settings.DB_CACHE_KEYS = {'default': 'ALL', 'second': 'ALL'}
+        johnny_settings.DB_CACHE_KEYS = {'default': 'default', 'second': 'default'}
 
         g1 = Genre.objects.using("default").get(pk=1)
         g1.title = "A default database"

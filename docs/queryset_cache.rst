@@ -201,17 +201,17 @@ database setups where writes are never issued to the slave, so Johnny would
 otherwise not invalidate a query cached for that slave when a write occurs
 on the master.  For example, if you have a simple database setup with one
 master and one slave, you could set both databases to use the database key
-``ALL`` when constructing cache keys like so::
+``default`` when constructing cache keys like so::
 
     DATABASES = {
         # ...
         'default': {
             # ...
-            'JOHNNY_CACHE_KEY': 'ALL',
+            'JOHNNY_CACHE_KEY': 'default',
         },
         'slave': {
             # ...
-            'JOHNNY_CACHE_KEY': 'ALL',
+            'JOHNNY_CACHE_KEY': 'default',
         },
     }
 
