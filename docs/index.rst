@@ -39,7 +39,7 @@ Usage
 
 .. highlight:: python
 
-A typical ``settings.py`` file configured for ``johnny-cache``::
+A typical ``settings.py`` file for Django 1.3 configured for ``johnny-cache``::
     
     # add johnny's middleware
     MIDDLEWARE_CLASSES = (
@@ -57,10 +57,8 @@ A typical ``settings.py`` file configured for ``johnny-cache``::
     }
     JOHNNY_MIDDLEWARE_KEY_PREFIX='jc_myproj'
 
-*Note*: The above configuration is for Django 1.3, which radically changed
-its cache configuration.  To see a full inspection of options for earlier
-versions of Django please see the `queryset cache <queryset_cache.html>`_
-docs.
+For a full inspection of options for earlier versions of Django please see 
+the `queryset cache <queryset_cache.html>`_ docs.
 
 The ``MIDDLEWARE_CLASSES`` setting enables two middlewares:  the outer one
 clears a thread-local dict-like cache located at ``johnny.cache.local`` at
@@ -83,8 +81,9 @@ see if you are doing anything that might require manual invalidation.
 Johnny does not define any views, urls, or models, so we can skip adding it
 to ``INSTALLED_APPS``.
 
-*Note*: Johnny is *not* enabled by default in scripts, management commands,
-asynchronous workers and the shell.  See `the queryset cache documentation
+*Note*: Since Johnny is enabled by the inclusion of middleware, it will not
+be enabled by default in scripts, management commands, asynchronous workers,
+or the django shell.  See `the queryset cache documentation
 <queryset_cache.html#using-with-scripts-management-commands-asynchronous-workers-and-the-shell>`_
 for instructions on how to enable it in these cases.
 
