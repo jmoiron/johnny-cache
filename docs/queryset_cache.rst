@@ -163,6 +163,38 @@ To manually invalidate a table or a model, use ``johnny.cache.invalidate``:
 
 .. autofunction:: johnny.cache.invalidate
 
+Using with scripts, management commands, asynchronous workers and the shell
+---------------------------------------------------------------------------
+
+Since the QuerySet Cache is enabled via middleware, queries made from outside
+of Django's request-response loop don't use Johnny. For example, saves and
+deletes don't invalidate models in management commands.
+
+You can enable the QuerySet Cache manually by instantiating the middleware in
+your code before using the ORM::
+
+    from johnny.middleware import QueryCacheMiddleware
+    qcm = QueryCacheMiddleware()
+
+    # do some work
+
+    qcm.unpatch() 
+    # this unpatches and flushes the cache
+ 
+To make sure Johnny is always active in management commands, you can enable it
+the project's ``__init__.py`` file::
+
+    cd /tmp
+    django-admin.py createproject myproject
+
+Now insert into ``/tmp/myproject/__init__.py``::
+
+    from johnny.middleware import QueryCacheMiddleware
+    QueryCacheMiddleware()
+
+This works because :func:`django.core.management.setup_environ` always imports
+the project module before executing the management command.
+
 
 Settings
 ~~~~~~~~
