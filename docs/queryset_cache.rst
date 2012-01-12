@@ -144,6 +144,21 @@ but the Django MySQL backend doesn't).  If you use savepoints and are
 encountering invalidation issues, please report a bug and see the 
 :ref:`manual-invalidation` section for possible workarounds.
 
+Multiple Databases
+------------------
+
+Johnny supports multiple databases in a variety of configurations. If using
+Johnny to cache results from a slave database, one should use the
+``DATABASES .. JOHNNY_CACHE_KEY`` setting (see below) to ensure that slave
+databases use the same database key as the master database.
+
+Please note that, in a master/slave database configuration, all of the typical
+problems still exist.  For example, if you update a table and then initiate a
+read on the slave before the change has had time to propagate, stale data may
+be returned and cached in Johnny.  As such, be certain that read queries
+prone to this issue are executed on a database that is guaranteed to be up to
+date.
+
 Usage
 ~~~~~
 
