@@ -61,6 +61,16 @@ def get_backend(**kwargs):
             "Johnny doesn't work on this version of Django.")
     return cls(**kwargs)
 
+def enable():
+    """Enable johnny-cache, for use in scripts, management commands, async
+    workers, or other code outside the django request flow."""
+    get_backend().patch()
+
+def disable():
+    """Disable johnny-cache.  This will disable johnny-cache for the whole
+    process, and if writes happen during the time where johnny is disabled,
+    tables will not be invalidated properly.  Use Carefully."""
+    get_backend().unpatch()
 
 def invalidate(*tables, **kwargs):
     """Invalidate the current generation for one or more tables.  The arguments
@@ -267,10 +277,6 @@ class KeyHandler(object):
         suffix = self.keygen.gen_key(sql, params, order, result_type)
         return '%s_%s_query_%s.%s' % (self.prefix, using, generation, suffix)
 
-
-# TODO: This QueryCacheBackend is for 1.2;  we need to write one for 1.1 as
-# well
-# we can test them out by using different virtualenvs pretty quickly
 
 # XXX: Thread safety concerns?  Should we only need to patch once per process?
 class QueryCacheBackend(object):
