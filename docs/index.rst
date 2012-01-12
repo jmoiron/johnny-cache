@@ -83,6 +83,12 @@ see if you are doing anything that might require manual invalidation.
 Johnny does not define any views, urls, or models, so we can skip adding it
 to ``INSTALLED_APPS``.
 
+*Note*: Johnny is *not* enabled by default in scripts, management commands,
+asynchronous workers and the shell.  See `the queryset cache documentation
+<queryset_cache.html#using-with-scripts-management-commands-asynchronous-workers-and-the-shell>`_
+for instructions on how to enable it in these cases.
+
+
 New in this version
 ~~~~~~~~~~~~~~~~~~~
 
