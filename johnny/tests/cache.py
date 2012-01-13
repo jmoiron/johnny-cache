@@ -138,6 +138,37 @@ class MultiDbTest(TransactionQueryCacheBase):
         for c in connections:
             self.failUnless(len(connections[c].queries) == 1)
 
+    def test_cache_key_setting(self):
+        """Tests that two databases use a single cached object when given the same DB cache key"""
+        if len(getattr(settings, "DATABASES", [])) <= 1:
+            print "\n  Skipping multi database tests"
+            return
+
+        from testapp.models import Genre
+        from django.db import connections
+
+        self.failUnless("default" in getattr(settings, "DATABASES"))
+        self.failUnless("second" in getattr(settings, "DATABASES"))
+
+        old_cache_keys = johnny_settings.DB_CACHE_KEYS
+        johnny_settings.DB_CACHE_KEYS = {'default': 'default', 'second': 'default'}
+
+        g1 = Genre.objects.using("default").get(pk=1)
+        g1.title = "A default database"
+        g1.save(using='default')
+        g2 = Genre.objects.using("second").get(pk=1)
+        g2.title = "A second database"
+        g2.save(using='second')
+        for c in connections:
+            connections[c].queries = []
+        #fresh from cache since we saved each
+        g1 = Genre.objects.using('default').get(pk=1)
+        g2 = Genre.objects.using('second').get(pk=1)
+        johnny_settings.DB_CACHE_KEYS = old_cache_keys
+        total_queries = sum([len(connections[c].queries)
+                             for c in connections])
+        self.assertEqual(total_queries, 1)
+
     def test_transactions(self):
         """Tests transaction rollbacks and local cache for multiple dbs"""
 

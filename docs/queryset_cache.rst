@@ -144,6 +144,21 @@ but the Django MySQL backend doesn't).  If you use savepoints and are
 encountering invalidation issues, please report a bug and see the 
 :ref:`manual-invalidation` section for possible workarounds.
 
+Multiple Databases
+------------------
+
+Johnny supports multiple databases in a variety of configurations. If using
+Johnny to cache results from a slave database, one should use the
+``DATABASES .. JOHNNY_CACHE_KEY`` setting (see below) to ensure that slave
+databases use the same database key as the master database.
+
+Please note that, in a master/slave database configuration, all of the typical
+problems still exist.  For example, if you update a table and then initiate a
+read on the slave before the change has had time to propagate, stale data may
+be returned and cached in Johnny.  As such, be certain that read queries
+prone to this issue are executed on a database that is guaranteed to be up to
+date.
+
 Usage
 ~~~~~
 
@@ -197,6 +212,7 @@ Settings
 The following settings are available for the QuerySet Cache:
 
 * ``CACHES .. JOHNNY_CACHE``
+* ``DATABASES .. JOHNNY_CACHE_KEY``
 * ``DISABLE_QUERYSET_CACHE``
 * ``JOHNNY_MIDDLEWARE_KEY_PREFIX``
 * ``JOHNNY_MIDDLEWARE_SECONDS``
@@ -220,6 +236,26 @@ defined, a warning will be printed if ``JOHNNY_CACHE`` is found to be ``True``
 in multiple cache definitions.  If ``JOHNNY_CACHE`` is not present, Johnny
 will fall back to the deprecated ``JOHNNY_CACHE_BACKEND`` setting if set,
 and then to the default cache.
+
+``DATABASES .. JOHNNY_CACHE_KEY`` allows  you to override the default key
+used for the given database.  This is useful, for example, in master/slave
+database setups where writes are never issued to the slave, so Johnny would
+otherwise not invalidate a query cached for that slave when a write occurs
+on the master.  For example, if you have a simple database setup with one
+master and one slave, you could set both databases to use the database key
+``default`` when constructing cache keys like so::
+
+    DATABASES = {
+        # ...
+        'default': {
+            # ...
+            'JOHNNY_CACHE_KEY': 'default',
+        },
+        'slave': {
+            # ...
+            'JOHNNY_CACHE_KEY': 'default',
+        },
+    }
 
 ``DISABLE_QUERYSET_CACHE`` will disable the QuerySet cache even if the
 middleware is installed.  This is mostly to make it easy for non-production
