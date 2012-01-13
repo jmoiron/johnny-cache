@@ -175,9 +175,15 @@ class MultiDbTest(TransactionQueryCacheBase):
         if len(getattr(settings, "DATABASES", [])) <= 1:
             print "\n  Skipping multi database tests"
             return
-        if settings.DATABASE_ENGINE == 'sqlite3':
-            print "\n  Skipping test requiring multiple threads."
-            return
+        if hasattr(settings, 'DATABASE_ENGINE'):
+            if settings.DATABASE_ENGINE == 'sqlite3':
+                print "\n  Skipping test requiring multiple threads."
+                return
+        else:
+            for db in settings.DATABASES.values():
+                if db['ENGINE'] == 'sqlite3':
+                    print "\n  Skipping test requiring multiple threads."
+                    return
         from Queue import Queue as queue
         q = queue()
         other = lambda x: self._run_threaded(x, q)
