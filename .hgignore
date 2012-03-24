@@ -1,7 +1,9 @@
 syntax: glob
 
 tags
+tarballs
 django*
+Django*
 local_settings.py
 *.pyc
 *.swp

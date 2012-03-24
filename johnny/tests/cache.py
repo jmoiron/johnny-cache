@@ -356,6 +356,26 @@ class MultiDbTest(TransactionQueryCacheBase):
 class SingleModelTest(QueryCacheBase):
     fixtures = base.johnny_fixtures
 
+    def test_multi_where_cache_coherency(self):
+        """A test to detect the issue described in bitbucket #24:
+        https://bitbucket.org/jmoiron/johnny-cache/issue/24/
+        """
+        from testapp.models import Issue24Model as i24m
+
+        i24m.objects.get_or_create(one=1, two=1)
+        i24m.objects.get_or_create(one=1, two=2)
+        i24m.objects.get_or_create(one=2, two=1)
+        i24m.objects.get_or_create(one=2, two=2)
+
+        ones = i24m.objects.filter(one=1)
+        twos = i24m.objects.filter(two=1)
+
+        res = i24m.objects.filter(one__in=ones).exclude(two=twos).all()
+        # XXX: I'm afraid I don't even understand what this is supposed
+        # to be doing here, and in any case this test case fails.  I've
+        # included something similar to the patch in #24, if someone knows
+        # how to write a test case to create that condition please do so here
+
     def test_basic_querycaching(self):
         """A basic test that querycaching is functioning properly and is
         being invalidated properly on singular table reads & writes."""

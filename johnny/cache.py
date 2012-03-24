@@ -72,6 +72,8 @@ def disable():
     tables will not be invalidated properly.  Use Carefully."""
     get_backend().unpatch()
 
+patch,unpatch = enable,disable
+
 def invalidate(*tables, **kwargs):
     """Invalidate the current generation for one or more tables.  The arguments
     can be either strings representing database table names or models.  Pass in
@@ -109,10 +111,10 @@ def get_tables_for_query(query):
                     tables += get_tables_for_query(item.query)
         return tables
 
-    if (query.where and query.where.children and
-            isinstance(query.where.children[0], WhereNode)):
-        where_node = query.where.children[0]
-        tables = get_tables(where_node, tables)
+    if query.where and query.where.children:
+        where_nodes = [c for c in query.where.children if isinstance(c, WhereNode)]
+        for node in where_nodes:
+            tables += get_tables(node, tables)
 
     return list(set(tables))
 

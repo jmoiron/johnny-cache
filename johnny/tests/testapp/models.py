@@ -10,6 +10,10 @@ from django.utils.translation import ugettext_lazy as _
 
 #from basic.people.models import Person
 
+class Issue24Model(models.Model):
+    one = models.PositiveIntegerField()
+    two = models.PositiveIntegerField()
+
 class User(models.Model):
     """User model."""
     first_name = models.CharField('first name', blank=True, max_length=128)
