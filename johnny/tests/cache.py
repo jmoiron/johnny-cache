@@ -6,6 +6,10 @@
 import django
 from django.conf import settings
 from django.db import connection
+try:
+    from django.db import connections
+except:
+    connections = None
 from johnny import middleware
 from johnny import settings as johnny_settings
 import base
@@ -668,6 +672,11 @@ class TransactionSupportTest(TransactionQueryCacheBase):
             obj = eval(_query)
             msg.append(obj)
             queue.put(msg)
+            if connections is not None:
+                #this is to fix a race condition with the
+                #thread to ensure that we close it before 
+                #the next test runs
+                connections['default'].close()
         t = Thread(target=_inner, args=(query,))
         t.start()
         t.join()
@@ -739,6 +748,7 @@ class TransactionSupportTest(TransactionQueryCacheBase):
 
         Similar to the commit, this sets up a write to a db in a transaction,
         reads from it (to force a cache write of sometime), then rolls back."""
+
         from Queue import Queue as queue
         from django.db import transaction
         from testapp.models import Genre, Publisher
