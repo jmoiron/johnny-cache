@@ -246,7 +246,7 @@ class KeyHandler(object):
         #if local.get('in_test', None): print str(val).ljust(32), key
         if val == None:
             val = self.keygen.random_generator()
-            self.cache_backend.set(key, val, 0, db)
+            self.cache_backend.set(key, val, settings.MIDDLEWARE_SECONDS, db)
         return val
 
     def get_multi_generation(self, tables, db='default'):
@@ -260,7 +260,7 @@ class KeyHandler(object):
         #if local.get('in_test', None): print str(val).ljust(32), key
         if val == None:
             val = self.keygen.random_generator()
-            self.cache_backend.set(key, val, 0, db)
+            self.cache_backend.set(key, val, settings.MIDDLEWARE_SECONDS, db)
         return val
 
     def invalidate_table(self, table, db='default'):
@@ -269,7 +269,7 @@ class KeyHandler(object):
         containing the table)"""
         key = self.keygen.gen_table_key(table, db)
         val = self.keygen.random_generator()
-        self.cache_backend.set(key, val, 0, db)
+        self.cache_backend.set(key, val, settings.MIDDLEWARE_SECONDS, db)
         return val
 
     def sql_key(self, generation, sql, params, order, result_type,
@@ -376,7 +376,7 @@ class QueryCacheBackend(object):
                 #todo - create a smart iterable wrapper
                 val = list(val)
             if key is not None:
-                self.cache_backend.set(key, val, 0, db)
+                self.cache_backend.set(key, val, settings.MIDDLEWARE_SECONDS, db)
             return val
         return newfun
 
