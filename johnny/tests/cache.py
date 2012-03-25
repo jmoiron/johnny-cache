@@ -512,6 +512,15 @@ class SingleModelTest(QueryCacheBase):
         second = list(Genre.objects.filter(title__startswith='A').order_by('slug'))
         self.failUnless(len(misses) == len(hits) == 1)
 
+    def test_in_values_list(self):
+        from testapp.models import Publisher, Book
+        from johnny.cache import get_tables_for_query
+        pubs = Publisher.objects.all()
+        books = Book.objects.filter(publisher__in=pubs.values_list("id", flat=True))
+        tables = list(sorted(get_tables_for_query(books.query)))
+        self.assertEqual(["testapp_book", "testapp_publisher"], tables)
+
+
 class MultiModelTest(QueryCacheBase):
     fixtures = base.johnny_fixtures
 
