@@ -19,8 +19,15 @@ from johnny import settings
 from transaction import TransactionManager
 
 import django
+from django.conf import settings as django_settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models.signals import post_save, post_delete
+
+# This sentinel is the representation for "None" that johnny will use in
+# memcached.  In order to avoid possible issues with users taking this value
+# and submitting it as data, this sentinel will also include the md5 hash of
+# the project's SECRET KEY, established with ``startproject``
+sentinel = 'dca94c3916af44dc9fa2eebb8fcbf8a9' + md5(django_settings.SECRET_KEY).hexdigest()
 
 try:
     any
@@ -361,6 +368,8 @@ class QueryCacheBackend(object):
                 signals.qc_hit.send(sender=cls, tables=tables,
                         query=(sql, params, cls.query.ordering_aliases),
                         size=len(val), key=key)
+                if val is sentinel:
+                    return None
                 return val
 
             signals.qc_miss.send(sender=cls, tables=tables,
@@ -376,7 +385,7 @@ class QueryCacheBackend(object):
                 #todo - create a smart iterable wrapper
                 val = list(val)
             if key is not None:
-                self.cache_backend.set(key, val, settings.MIDDLEWARE_SECONDS, db)
+                self.cache_backend.set(key, val or sentinel, settings.MIDDLEWARE_SECONDS, db)
             return val
         return newfun
 
