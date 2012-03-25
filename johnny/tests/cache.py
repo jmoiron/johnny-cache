@@ -380,6 +380,16 @@ class SingleModelTest(QueryCacheBase):
         # included something similar to the patch in #24, if someone knows
         # how to write a test case to create that condition please do so here
 
+    def test_exists_hit(self):
+        """Tests that an exist failure caches properly"""
+        from testapp.models import Publisher
+        connection.queries = []
+
+        Publisher.objects.filter(title="Doesn't Exist").exists()
+        Publisher.objects.filter(title="Doesn't Exist").exists()
+
+        self.failUnless(len(connection.queries) == 1)
+
     def test_basic_querycaching(self):
         """A basic test that querycaching is functioning properly and is
         being invalidated properly on singular table reads & writes."""
