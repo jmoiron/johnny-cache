@@ -276,6 +276,11 @@ not using one of Johnny's `custom backends <backends.html>`_, the default
 value of ``0`` will work differently on different backends and might cause 
 Johnny to never cache anything.
 
+``JOHNNY_TABLE_WHITELIST``, default "[]", is a user defined tuple that 
+contains table names for exclusive inclusion in the cache. If you provide this
+setting, the ``MAN_IN_BLACKLIST`` (and ``JOHNNY_TABLE_BLACKLIST``) settings 
+are ignored.
+
 ``MAN_IN_BLACKLIST`` is a user defined tuple that contains table names to
 exclude from the QuerySet Cache.  If you have no sense of humor, or want your
 settings file to be understandable, you can use the alias
