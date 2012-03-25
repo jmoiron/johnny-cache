@@ -1,22 +1,41 @@
-try:
-    from celery.utils import fun_takes_kwargs
-except:
-    fun_takes_kwargs = None
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""Extra johnny utilities."""
+
 try:
     from functools import wraps
-except:
+except ImportError:
     from django.utils.functional import wraps
 
-from johnny.cache import get_backend, local
+from johnny.cache import get_backend, local, patch, unpatch
 
+__all__ = ["celery_enable_all", "celery_task_wrapper", "johnny_task_wrapper"]
 
-def johnny_task_wrapper(f):
+def prerun_handler(*args, **kwargs):
+    """Celery pre-run handler.  Enables johnny-cache."""
+    patch()
+
+def postrun_handler(*args, **kwargs):
+    """Celery postrun handler.  Unpatches and clears the localstore."""
+    unpatch()
+    local.clear()
+
+def celery_enable_all():
+    """Enable johnny-cache in all celery tasks, clearing the local-store
+    after each task."""
+    from celery.signals import task_prerun, task_postrun, task_failure
+    task_prerun.connect(task_prerun_handler)
+    task_postrun.connect(task_postrun_handler)
+    # Also have to cleanup on failure.
+    task_failure.connect(task_postrun_handler)
+
+def celery_task_wrapper(f):
     """
     Provides a task wrapper for celery that sets up cache and ensures
     that the local store is cleared after completion
     """
-    if fun_takes_kwargs is None:
-        return f
+    from celery.utils import fun_takes_kwargs
 
     @wraps(f)
     def newf(*args, **kwargs):
@@ -38,3 +57,7 @@ def johnny_task_wrapper(f):
             get_backend().unpatch()
         return ret
     return newf
+
+# backwards compatible alias
+johnny_task_wrapper = celery_task_wrapper
+
