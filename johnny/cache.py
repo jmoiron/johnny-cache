@@ -101,13 +101,14 @@ def get_tables_for_query(query):
     from django.db.models.query import QuerySet
     tables = list(query.tables) or getattr(query, 'table_map', {}).keys()
 
-    def get_tables(where_node, tables):
-        for child in where_node.children:
+    def get_tables(node, tables):
+        for child in node.children:
             if isinstance(child, WhereNode):  # and child.children:
                 tables = get_tables(child, tables)
+            elif not hasattr(child, '__iter__'):
                 continue
-            for item in child:
-                if isinstance(item, QuerySet):
+            else:
+                for item in (c for c in child if isinstance(c, QuerySet)):
                     tables += get_tables_for_query(item.query)
         return tables
 
