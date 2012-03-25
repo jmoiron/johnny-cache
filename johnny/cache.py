@@ -445,6 +445,16 @@ class QueryCacheBackend(object):
         if self._patched:
             self.keyhandler.invalidate_table(instance._meta.db_table)
 
+            tables = set()
+            tables.add(instance._meta.db_table)
+            self.keyhandler.invalidate_table(instance._meta.db_table)
+
+            for obj in instance._meta._related_objects_cache.keys():
+                obj_table = obj.model._meta.db_table
+                if obj_table not in tables:
+                    tables.add(obj_table)
+                    self.keyhandler.invalidate_table(obj_table)
+
     def _handle_signals(self):
         post_save.connect(self.invalidate, sender=None)
         post_delete.connect(self.invalidate, sender=None)
