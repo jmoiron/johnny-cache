@@ -4,7 +4,7 @@
 """Base test class for Johnny Cache Tests."""
 
 import sys
-from functools import wraps
+from django.utils.functional import wraps
 
 import django
 from django.test import TestCase, TransactionTestCase
@@ -26,8 +26,8 @@ def show_johnny_signals(hit=None, miss=None):
         print "hit:\n\t%s\n\t%s\n" % (pformat(args), pformat(kwargs))
     def _miss(*args, **kwargs):
         print "miss:\n\t%s\n\t%s\n" % (pformat(args), pformat(kwargs))
-    hit = _hit if hit is None else hit
-    miss = _miss if miss is None else miss
+    hit = hit or _hit
+    miss = miss or _miss
     def deco(func):
         @wraps(func)
         def wrapped(*args, **kwargs):
@@ -36,8 +36,6 @@ def show_johnny_signals(hit=None, miss=None):
             qc_miss.connect(miss)
             try:
                 ret = func(*args, **kwargs)
-            except e:
-                raise
             finally:
                 qc_hit.disconnect(hit)
                 qc_miss.disconnect(miss)
