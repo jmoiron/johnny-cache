@@ -388,7 +388,7 @@ class SingleModelTest(QueryCacheBase):
         Publisher.objects.filter(title="Doesn't Exist").exists()
         Publisher.objects.filter(title="Doesn't Exist").exists()
 
-        self.failUnless(len(connection.queries) == 1)
+        self.assertEqual(len(connection.queries), 1)
 
     def test_basic_querycaching(self):
         """A basic test that querycaching is functioning properly and is
