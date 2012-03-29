@@ -163,9 +163,14 @@ class TransactionManager(object):
         return connection.features.uses_savepoints
 
     def _sid_key(self, sid, using=None):
-        if using != None:
-            return 'trans_savepoint_%s_%s' % (using, sid)
-        return 'trans_savepoint_%s' % sid
+        if using is not None:
+            prefix = 'trans_savepoint_%s'%using
+        else:
+            prefix = 'trans_savepoint'
+
+        if sid.startswith(prefix):
+            return sid
+        return '%s_%s'%(prefix, sid)
 
     def _create_savepoint(self, sid, using=None):
         key = self._sid_key(sid, using)

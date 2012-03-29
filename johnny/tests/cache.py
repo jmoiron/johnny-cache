@@ -23,7 +23,7 @@ except NameError:
         return False
 
 # put tests in here to be included in the testing suite
-__all__ = ['MultiDbTest', 'SingleModelTest', 'MultiModelTest', 'TransactionSupportTest', 'BlackListTest']
+__all__ = ['MultiDbTest', 'SingleModelTest', 'MultiModelTest', 'TransactionSupportTest', 'BlackListTest', 'TransactionManagerTestCase']
 
 def _pre_setup(self):
     self.saved_DISABLE_SETTING = getattr(johnny_settings, 'DISABLE_QUERYSET_CACHE', False)
@@ -904,3 +904,46 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         self.failUnless(g.title == "In the Void")
         transaction.managed(False)
         transaction.leave_transaction_management()
+
+import johnny
+class TransactionManagerTestCase(base.TransactionJohnnyTestCase):
+
+    def setUp(self):
+        self.middleware = middleware.QueryCacheMiddleware()
+    
+    def tearDown(self):
+        from django.db import transaction
+        if transaction.is_managed():
+            transaction.managed(False)
+
+    def test_savepoint_localstore_flush(self):
+        """
+        This is a very simple test to see if savepoints will actually
+        be committed, i.e. flushed out from localstore into cache.
+        """
+        from django.db import transaction
+        transaction.enter_transaction_management()
+        transaction.managed()
+
+        TABLE_NAME = 'test_table'
+        cache_backend = johnny.cache.get_backend()
+        cache_backend.patch()
+        keyhandler = cache_backend.keyhandler
+        keygen = keyhandler.keygen
+        
+        tm = cache_backend.cache_backend
+        
+        # First, we set one key-val pair generated for our non-existing table.
+        table_key = keygen.gen_table_key(TABLE_NAME)
+        tm.set(table_key, 'val1')
+
+        # Then we create a savepoint.
+        # The key-value pair is moved into 'trans_sids' item of localstore.
+        tm._create_savepoint('savepoint1')
+        
+        # We then commit all the savepoints (i.e. only one in this case)
+        # The items stored in 'trans_sids' should be moved back to the
+        # top-level dictionary of our localstore
+        tm._commit_all_savepoints()
+        # And this checks if it actually happened.
+        self.failUnless(table_key in tm.local)
