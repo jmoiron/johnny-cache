@@ -458,6 +458,11 @@ class QueryCacheBackend(object):
             tables.add(instance._meta.db_table)
             self.keyhandler.invalidate_table(instance._meta.db_table)
 
+            try:
+                 instance._meta._related_objects_cache
+            except AttributeError:
+                 instance._meta._fill_related_objects_cache()
+
             for obj in instance._meta._related_objects_cache.keys():
                 obj_table = obj.model._meta.db_table
                 if obj_table not in tables:
