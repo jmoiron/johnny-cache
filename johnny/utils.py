@@ -25,10 +25,10 @@ def celery_enable_all():
     """Enable johnny-cache in all celery tasks, clearing the local-store
     after each task."""
     from celery.signals import task_prerun, task_postrun, task_failure
-    task_prerun.connect(task_prerun_handler)
-    task_postrun.connect(task_postrun_handler)
+    task_prerun.connect(prerun_handler)
+    task_postrun.connect(postrun_handler)
     # Also have to cleanup on failure.
-    task_failure.connect(task_postrun_handler)
+    task_failure.connect(postrun_handler)
 
 def celery_task_wrapper(f):
     """
