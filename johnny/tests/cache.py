@@ -383,6 +383,9 @@ class SingleModelTest(QueryCacheBase):
     def test_exists_hit(self):
         """Tests that an exist failure caches properly"""
         from testapp.models import Publisher
+        if django.VERSION[:2] < (1, 2):
+            # django 1.1.x does not have exists()
+            return
         connection.queries = []
 
         Publisher.objects.filter(title="Doesn't Exist").exists()
