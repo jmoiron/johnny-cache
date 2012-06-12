@@ -184,17 +184,26 @@ class MultiDbTest(TransactionQueryCacheBase):
                 print "\n  Skipping test requiring multiple threads."
                 return
         else:
+            from django.db import connections, transaction
             for db in settings.DATABASES.values():
                 if db['ENGINE'] == 'sqlite3':
                     print "\n  Skipping test requiring multiple threads."
                     return
+
+            for conname in connections:
+                con = connections[conname]
+                if not base.supports_transactions(con):
+                    print "\n  Skipping test requiring transactions."
+                    return
+
+        from django.db import connections, transaction
+        from johnny import cache as c
         from Queue import Queue as queue
         q = queue()
         other = lambda x: self._run_threaded(x, q)
 
         from testapp.models import Genre
-        from django.db import connections, transaction
-        from johnny import cache as c
+
 
         # sanity check 
         self.failUnless(transaction.is_managed() == False)
@@ -727,13 +736,13 @@ class TransactionSupportTest(TransactionQueryCacheBase):
                 print "\n  Skipping test requiring multiple threads."
                 return
 
+
         self.failUnless(transaction.is_managed() == False)
         self.failUnless(transaction.is_dirty() == False)
         connection.queries = []
         cache.local.clear()
         q = queue()
         other = lambda x: self._run_threaded(x, q)
-
         # load some data
         start = Genre.objects.get(id=1)
         other('Genre.objects.get(id=1)')
