@@ -7,8 +7,12 @@ You can install johnny with pip::
 
     pip install johnny-cache
 
+You can fork johnny-cache `from its git repository
+<http://github.com/jmoiron/johnny-cache>`_::
+    
+    git clone http://github.com/jmoiron/johnny-cache.git
 
-You can fork johnny-cache `from its hg repository 
+Or if you prefer mercurial, from its `from its hg mirror 
 <http://bitbucket.org/jmoiron/johnny-cache>`_::
 
     hg clone http://bitbucket.org/jmoiron/johnny-cache
