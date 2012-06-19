@@ -12,7 +12,7 @@ You can fork johnny-cache `from its git repository
     
     git clone http://github.com/jmoiron/johnny-cache.git
 
-Or if you prefer mercurial, from its `from its hg mirror 
+Or if you prefer mercurial, `from its hg mirror 
 <http://bitbucket.org/jmoiron/johnny-cache>`_::
 
     hg clone http://bitbucket.org/jmoiron/johnny-cache
