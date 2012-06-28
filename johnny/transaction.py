@@ -6,10 +6,7 @@ try:
 except:
     DEFUALT_DB_ALIAS = None
 
-try:
-    from functools import wraps
-except ImportError:
-    from django.utils.functional import wraps  # Python 2.3, 2.4 fallback.
+from johnny.decorators import wraps, available_attrs
 
 
 class TransactionManager(object):
@@ -141,13 +138,13 @@ class TransactionManager(object):
         self._clear_sid_stack(using)
 
     def _patched(self, original, commit=True):
-        @wraps(original)
+        @wraps(original, assigned=available_attrs(original))
         def newfun(using=None):
             #1.2 version
             original(using=using)
             self._flush(commit=commit, using=using)
 
-        @wraps(original)
+        @wraps(original, assigned=available_attrs(original))
         def newfun11():
             #1.1 version
             original()
@@ -164,7 +161,7 @@ class TransactionManager(object):
 
     def _sid_key(self, sid, using=None):
         if using is not None:
-            prefix = 'trans_savepoint_%s'%using
+            prefix = 'trans_savepoint_%s' % using
         else:
             prefix = 'trans_savepoint'
 
@@ -261,7 +258,7 @@ class TransactionManager(object):
         del self.local[backup]
 
     def _savepoint(self, original):
-        @wraps(original)
+        @wraps(original, assigned=available_attrs(original))
         def newfun(using=None):
             if using != None:
                 sid = original(using=using)

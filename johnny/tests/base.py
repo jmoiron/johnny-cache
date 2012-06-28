@@ -4,7 +4,6 @@
 """Base test class for Johnny Cache Tests."""
 
 import sys
-from django.utils.functional import wraps
 
 import django
 from django.test import TestCase, TransactionTestCase
@@ -13,6 +12,7 @@ from django.core.management import call_command
 from django.db.models.loading import load_app
 
 from johnny import settings as johnny_settings
+from johnny.decorators import wraps, available_attrs
 
 # order matters here;  I guess we aren't deferring foreign key checking :\
 johnny_fixtures = ['authors.json', 'genres.json', 'publishers.json', 'books.json']
@@ -29,7 +29,7 @@ def show_johnny_signals(hit=None, miss=None):
     hit = hit or _hit
     miss = miss or _miss
     def deco(func):
-        @wraps(func)
+        @wraps(func, assigned=available_attrs(func))
         def wrapped(*args, **kwargs):
             from johnny.signals import qc_hit, qc_miss
             qc_hit.connect(hit)
