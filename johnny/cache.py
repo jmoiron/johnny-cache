@@ -5,10 +5,6 @@ import time
 from uuid import uuid4
 
 try:
-    from functools import wraps
-except ImportError:
-    from django.utils.functional import wraps  # Python 2.3, 2.4 fallback.
-try:
     from hashlib import md5
 except ImportError:
     from md5 import md5
@@ -16,6 +12,7 @@ except ImportError:
 import localstore
 import signals
 from johnny import settings
+from johnny.decorators import wraps, available_attrs
 from transaction import TransactionManager
 
 import django
@@ -157,7 +154,7 @@ def get_tables_for_query11(query):
 def timer(func):
     times = []
 
-    @wraps(func)
+    @wraps(func, assigned=available_attrs(func))
     def foo(*args, **kwargs):
         t0 = time.time()
         ret = func(*args, **kwargs)
@@ -324,7 +321,7 @@ class QueryCacheBackend(object):
         from django.db.models.sql.constants import MULTI
         from django.db.models.sql.datastructures import EmptyResultSet
 
-        @wraps(original)
+        @wraps(original, assigned=available_attrs(original))
         def newfun(cls, *args, **kwargs):
             if args:
                 result_type = args[0]
@@ -381,7 +378,7 @@ class QueryCacheBackend(object):
         return newfun
 
     def _monkey_write(self, original):
-        @wraps(original)
+        @wraps(original, assigned=available_attrs(original))
         def newfun(cls, *args, **kwargs):
             db = getattr(cls, 'using', 'default')
             from django.db.models.sql import compiler
@@ -487,7 +484,7 @@ class QueryCacheBackend11(QueryCacheBackend):
         from django.db.models.sql.constants import MULTI
         from django.db.models.sql.datastructures import EmptyResultSet
 
-        @wraps(original)
+        @wraps(original, assigned=available_attrs(original))
         def newfun(cls, result_type=MULTI):
             try:
                 sql, params = cls.as_sql()

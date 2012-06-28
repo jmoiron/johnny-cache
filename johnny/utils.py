@@ -3,14 +3,12 @@
 
 """Extra johnny utilities."""
 
-try:
-    from functools import wraps
-except ImportError:
-    from django.utils.functional import wraps
-
 from johnny.cache import get_backend, local, patch, unpatch
+from johnny.decorators import wraps, available_attrs
+
 
 __all__ = ["celery_enable_all", "celery_task_wrapper", "johnny_task_wrapper"]
+
 
 def prerun_handler(*args, **kwargs):
     """Celery pre-run handler.  Enables johnny-cache."""
@@ -37,7 +35,7 @@ def celery_task_wrapper(f):
     """
     from celery.utils import fun_takes_kwargs
 
-    @wraps(f)
+    @wraps(f, assigned=available_attrs(f))
     def newf(*args, **kwargs):
         backend = get_backend()
         was_patched = backend._patched
