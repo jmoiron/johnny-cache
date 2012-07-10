@@ -10,7 +10,7 @@ Johnny Cache is a caching framework for django_ applications.  It works with
 the django caching abstraction, but was developed specifically with the use of
 memcached_ in mind.  Its main feature is a patch on Django's ORM that
 automatically caches all reads in a consistent manner.  It works with Django 
-1.1, 1.2, and 1.3.
+1.1 thru 1.4 and python 2.4 thru 2.7.
 
 .. highlight:: sh
 
@@ -18,32 +18,33 @@ You can install johnny with pip::
 
     pip install johnny-cache
 
-You can fork johnny-cache `from its git repository 
-<http://github.com/jmoiron/johnny-cache>`_::
+You can fork johnny-cache `from its git repository`_::
 
-    git clone http://github.com/jmoiron/johnny-cache.git
+    git clone https://github.com/jmoiron/johnny-cache.git
 
-Or if you prefer mercurial, `from its hg mirror 
-<http://bitbucket.org/jmoiron/johnny-cache>`_::
+or, if you prefer, from its `hg mirror`_::
 
     hg clone http://bitbucket.org/jmoiron/johnny-cache
 
-
-Please use `bitbucket's issue tracker
-<http://bitbucket.org/jmoiron/johnny-cache/issues/>`_ to report bugs. Contact 
-the authors at `@jmoiron`_ and `@finder83`_.
+Please use `github's issue tracker`_ to report bugs.  Contact the authors at
+`@jmoiron`_ and `@finder83`_.
 
 .. _django: http://djangoproject.com
 .. _memcached: http://memcached.org
 .. _@jmoiron: http://twitter.com/jmoiron
 .. _@finder83: http://twitter.com/finder83
+.. _github's issue tracker: https://github.com/jmoiron/johnny-cache/issues
+.. _from its git repository: https://github.com/jmoiron/johnny-cache
+.. _hg mirror: http://bitbucket.org/jmoiron/johnny-cache
+
 
 Usage
 =====
 
 .. highlight:: python
 
-A typical ``settings.py`` file for Django 1.3 configured for ``johnny-cache``::
+A typical ``settings.py`` file for Django 1.3 or 1.4 configured for
+``johnny-cache``::
     
     # add johnny's middleware
     MIDDLEWARE_CLASSES = (
@@ -95,12 +96,41 @@ for instructions on how to enable it in these cases.
 New in this version
 ~~~~~~~~~~~~~~~~~~~
 
-* Django 1.3 support
+* Django 1.4 support
+* Redis backend
+* Master/Slave support
+* Cache whitelist
+* New celery task utilities
 
-The usage for ``johnny.cache.get_backend`` has changed;  it now returns a
-QueryCacheBackend instance rather than the appropriate version of the class.
-Most uses of this function would have been ``get_backend()()``, which can now
-be effectively replaced with ``get_backend()``.
+Version Numbering
+~~~~~~~~~~~~~~~~~
+
+Because Johnny tracks Django's release schedule with its own releases, and is
+itself a mature project, the version number has been bumped from 0.3 to 1.4 to
+coincide with the highest version of Django with support.  In the future,
+Johnny's version will track the major and minor version numbers of Django, but
+will have independent dot releases for bugfixes, maintenance, and backwards
+compatible feature enhancements.
+
+Deprecation Policy
+~~~~~~~~~~~~~~~~~~
+
+As of the release of Django 1.4, Django 1.1 and 1.2 are now officially
+unsupported projects.  In addition, in an effort to clean up code in preparation
+for eventual Python 3.3 support, Django 1.4 drops support for Python 2.4 and 
+Django 1.5 will drop support for Python 2.5.
+
+Johnny 1.4 will maintain support for Django 1.1+ and Python 2.4-2.7, as
+previous releases have had no official deprecation policies.  Future versions
+will:
+
+ * Adopt Django's Python version support & deprecation policy (including its
+   py3k adoption timeline)
+ * Support the 3 most recent versions of Django
+
+If Django development goals are met, this means that Johnny 1.5 will support
+Django 1.3-1.5 and Python 2.6+, with experimental Python 3.3 support.
+
 
 In Depth Documentation
 ~~~~~~~~~~~~~~~~~~~~~~
