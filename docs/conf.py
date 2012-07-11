@@ -19,6 +19,10 @@ import sys, os
 projpath = os.path.abspath('..')
 sys.path.append(projpath)
 
+from django.core.management import setup_environ
+import settings
+setup_environ(settings)
+
 # -- General configuration -----------------------------------------------------
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
