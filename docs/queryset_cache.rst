@@ -28,7 +28,7 @@ now lost.  This means on an LRU cache (like memcached, which maintains an
 LRU per slab), you can cache reads forever and the old generations will
 naturally expire out faster than any "live" cache data.
 
-The QuerySet Cache supports Django versions 1.1, 1.2, and 1.3.
+The QuerySet Cache supports Django versions 1.1, 1.2, 1.3, and 1.4
 
 .. autoclass:: johnny.cache.QueryCacheBackend
 
