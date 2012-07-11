@@ -124,12 +124,15 @@ Johnny 1.4 will maintain support for Django 1.1+ and Python 2.4 thru 2.7, as
 previous releases have had no official deprecation policies.  Future versions
 will:
 
- * Adopt Django's Python version support & deprecation policy (including its
-   py3k adoption timeline)
+ * Adopt Django's Python version support & deprecation policy (including py3k
+   adoption)
  * Support the 3 most recent versions of Django
 
 If Django development goals are met, this means that Johnny 1.5 will support
-Django 1.3-1.5 and Python 2.6+, with experimental Python 3.3 support.
+Django 1.3-1.5 and Python 2.6+, with experimental Python 3.3 support.  This
+also means that, while future versions of Johnny will be compatible with older
+versions of Django, they might not be compatible with all of the supported
+versions of *python* for these old versions.
 
 
 In Depth Documentation
