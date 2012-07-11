@@ -97,7 +97,7 @@ New in this version
 ~~~~~~~~~~~~~~~~~~~
 
 * Django 1.4 support
-* Redis backend
+* Redis backend (requires ``django-redis-cache``)
 * Master/Slave support
 * Cache whitelist
 * New celery task utilities
