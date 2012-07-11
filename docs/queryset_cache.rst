@@ -163,11 +163,7 @@ Usage
 ~~~~~
 
 To enable the QuerySet Cache, enable the middleware 
-``johnny.middleware.QueryCacheMiddleware``.  This middleware uses the `borg
-pattern <http://code.activestate.com/recipes/66531/>`_;  to remove the applied
-monkey patch, you can call ``johnny.middleware.QueryCacheMiddleware().unpatch()``,
-but the middleware will attempt to install itself again unless you also
-set ``settings.DISABLE_QUERYSET_CACHE`` to ``True``.
+``johnny.middleware.QueryCacheMiddleware``.
 
 .. _manual-invalidation:
 
@@ -183,7 +179,7 @@ Using with scripts, management commands, asynchronous workers and the shell
 
 Since the QuerySet Cache is enabled via middleware, queries made from outside
 of Django's request-response loop will neither be cached nor used to invalidate
-the cache.  This can lead to stale data persisting in the cache.
+the cache.  This can lead to stale data in the cache.
 
 You can enable and disable the QuerySet Cache by using the convenience
 functions:
@@ -205,7 +201,6 @@ Now, in ``myproject/__init__.py``::
 This works because ``django.core.management.setup_environ`` always imports
 the project module before executing the management command.
 
-
 Settings
 ~~~~~~~~
 
@@ -216,7 +211,8 @@ The following settings are available for the QuerySet Cache:
 * ``DISABLE_QUERYSET_CACHE``
 * ``JOHNNY_MIDDLEWARE_KEY_PREFIX``
 * ``JOHNNY_MIDDLEWARE_SECONDS``
-* ``MAN_IN_BLACKLIST``
+* ``JOHNNY_TABLE_WHITELIST``
+* ``MAN_IN_BLACKLIST`` (``JOHNNY_TABLE_BLACKLIST``)
 
 .. highlight:: python
 

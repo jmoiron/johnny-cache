@@ -120,7 +120,7 @@ unsupported projects.  In addition, in an effort to clean up code in preparation
 for eventual Python 3.3 support, Django 1.4 drops support for Python 2.4 and 
 Django 1.5 will drop support for Python 2.5.
 
-Johnny 1.4 will maintain support for Django 1.1+ and Python 2.4-2.7, as
+Johnny 1.4 will maintain support for Django 1.1+ and Python 2.4 thru 2.7, as
 previous releases have had no official deprecation policies.  Future versions
 will:
 

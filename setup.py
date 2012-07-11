@@ -5,7 +5,7 @@ import os
 from setuptools import setup
 #from distutils.core import setup
 
-version = '1.4-pre1'
+version = '1.4'
 
 setup(name='johnny-cache',
       version=version,
@@ -13,7 +13,7 @@ setup(name='johnny-cache',
                   "read queries.",
       long_description=open('README.rst').read(),
       classifiers=[
-          'Development Status :: 4 - Beta',
+          'Development Status :: 5 - Production/Stable',
           'Intended Audience :: Developers',
           'License :: OSI Approved :: MIT License',
           'Programming Language :: Python',
