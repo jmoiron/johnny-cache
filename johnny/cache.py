@@ -42,6 +42,16 @@ def disallowed_table(*tables):
     return not bool(settings.WHITELIST.issuperset(tables)) if settings.WHITELIST\
         else bool(settings.BLACKLIST.intersection(tables))
 
+def is_query_random(query):
+    """
+    Controls every query for the possibility of ORDER BY RAND().
+    """
+    pattern = re.compile('RAND\(\)', re.IGNORECASE)
+    matches = pattern.search(query)
+    if matches:
+        return True
+    return False
+
 
 def get_backend(**kwargs):
     """
@@ -346,7 +356,7 @@ class QueryCacheBackend(object):
             # check the blacklist for any of the involved tables;  if it's not
             # there, then look for the value in the cache.
             tables = get_tables_for_query(cls.query)
-            if tables and not disallowed_table(*tables):
+            if tables and not disallowed_table(*tables) and not is_query_random(cls.as_sql()[0]):
                 gen_key = self.keyhandler.get_generation(*tables,
                                                          **{'db': db})
                 key = self.keyhandler.sql_key(gen_key, sql, params,
@@ -500,7 +510,7 @@ class QueryCacheBackend11(QueryCacheBackend):
             tables = get_tables_for_query11(cls)
             # check the blacklist for any of the involved tables;  if it's not
             # there, then look for the value in the cache.
-            if tables and not disallowed_table(*tables):
+            if tables and not disallowed_table(*tables) and not is_query_random(cls.as_sql()[0]):
                 gen_key = self.keyhandler.get_generation(*tables)
                 key = self.keyhandler.sql_key(gen_key, sql, params,
                         cls.ordering_aliases, result_type)
