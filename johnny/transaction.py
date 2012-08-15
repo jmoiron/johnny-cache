@@ -63,8 +63,8 @@ class TransactionManager(object):
             return True
         return False
 
-    def is_managed(self):
-        return django_transaction.is_managed()
+    def is_managed(self, using=None):
+        return django_transaction.is_managed(using=using)
 
     def get(self, key, default=None, using=None):
         if self.is_managed() and self._patched_var:
@@ -104,7 +104,7 @@ class TransactionManager(object):
         """
         if timeout is None:
             timeout = self.timeout
-        if self.is_managed() and self._patched_var:
+        if self.is_managed(using=using) and self._patched_var:
             self.local[key] = val
         else:
             self.cache_backend.set(key, val, timeout)
