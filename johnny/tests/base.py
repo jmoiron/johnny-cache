@@ -114,14 +114,16 @@ class message_queue(object):
     handlers use weakrefs, so if we don't save references to this object they
     will get gc'd pretty fast."""
     def __init__(self):
-        from johnny.signals import qc_hit, qc_miss
+        from johnny.signals import qc_hit, qc_miss, qc_skip
         from Queue import Queue as queue
         self.q = queue()
         qc_hit.connect(self._hit)
         qc_miss.connect(self._miss)
+        qc_skip.connect(self._skip)
 
     def _hit(self, *a, **k): self.q.put(True)
     def _miss(self, *a, **k): self.q.put(False)
+    def _skip(self, *a, **k): self.q.put(False)
 
     def clear(self):
         while not self.q.empty():

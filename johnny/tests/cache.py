@@ -84,7 +84,7 @@ class MultiDbTest(TransactionQueryCacheBase):
         from threading import Thread
         def _inner(_query):
             from testapp.models import Genre, Book, Publisher, Person
-            from johnny.signals import qc_hit, qc_miss
+            from johnny.signals import qc_hit, qc_miss, qc_skip
             from johnny.cache import local
             from django.db import transaction
             msg = []
@@ -92,8 +92,11 @@ class MultiDbTest(TransactionQueryCacheBase):
                 msg.append(True)
             def miss(*args, **kwargs):
                 msg.append(False)
+            def skip(*args, **kwargs):
+                msg.append(False)
             qc_hit.connect(hit)
             qc_miss.connect(miss)
+            qc_skip.connect(skip)
             obj = eval(_query)
             msg.append(obj)
             queue.put(msg)
@@ -520,7 +523,7 @@ class SingleModelTest(QueryCacheBase):
     def test_signals(self):
         """Test that the signals we say we're sending are being sent."""
         from testapp.models import Genre
-        from johnny.signals import qc_hit, qc_miss
+        from johnny.signals import qc_hit, qc_miss, qc_skip
         connection.queries = []
         misses = []
         hits = []
@@ -530,6 +533,7 @@ class SingleModelTest(QueryCacheBase):
             misses.append(kwargs['key'])
         qc_hit.connect(qc_hit_listener)
         qc_miss.connect(qc_miss_listener)
+        qc_skip.connect(qc_miss_listener)
         first = list(Genre.objects.filter(title__startswith='A').order_by('slug'))
         second = list(Genre.objects.filter(title__startswith='A').order_by('slug'))
         self.failUnless(len(misses) == len(hits) == 1)
@@ -692,7 +696,7 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         from threading import Thread
         def _inner(_query):
             from testapp.models import Genre, Book, Publisher, Person
-            from johnny.signals import qc_hit, qc_miss
+            from johnny.signals import qc_hit, qc_miss, qc_skip
             msg = []
             def hit(*args, **kwargs):
                 msg.append(True)
@@ -700,6 +704,7 @@ class TransactionSupportTest(TransactionQueryCacheBase):
                 msg.append(False)
             qc_hit.connect(hit)
             qc_miss.connect(miss)
+            qc_skip.connect(miss)
             obj = eval(_query)
             msg.append(obj)
             queue.put(msg)

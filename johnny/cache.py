@@ -346,9 +346,14 @@ class QueryCacheBackend(object):
             # check the blacklist for any of the involved tables;  if it's not
             # there, then look for the value in the cache.
             tables = get_tables_for_query(cls.query)
-            if tables and not disallowed_table(*tables):
-                gen_key = self.keyhandler.get_generation(*tables,
-                                                         **{'db': db})
+            # if the tables are blacklisted, send a qc_skip signal
+            blacklisted = disallowed_table(*tables)
+            if blacklisted:
+                signals.qc_skip.send(sender=cls, tables=tables,
+                    query=(sql, params, cls.query.ordering_aliases),
+                    key=key)
+            if tables and not blacklisted:
+                gen_key = self.keyhandler.get_generation(*tables, **{'db': db})
                 key = self.keyhandler.sql_key(gen_key, sql, params,
                                               cls.get_ordering(),
                                               result_type, db)
@@ -360,7 +365,8 @@ class QueryCacheBackend(object):
                         size=len(val), key=key)
                 return val
 
-            signals.qc_miss.send(sender=cls, tables=tables,
+            if not blacklisted:
+                signals.qc_miss.send(sender=cls, tables=tables,
                     query=(sql, params, cls.query.ordering_aliases),
                     key=key)
 
@@ -498,9 +504,13 @@ class QueryCacheBackend11(QueryCacheBackend):
 
             val, key = None, None
             tables = get_tables_for_query11(cls)
-            # check the blacklist for any of the involved tables;  if it's not
-            # there, then look for the value in the cache.
-            if tables and not disallowed_table(*tables):
+            blacklisted = disallowed_table(*tables)
+            if blacklisted:
+                signals.qc_skip.send(sender=cls, tables=tables,
+                    query=(sql, params, cls.ordering_aliases),
+                    key=key)
+
+            if tables and not blacklisted:
                 gen_key = self.keyhandler.get_generation(*tables)
                 key = self.keyhandler.sql_key(gen_key, sql, params,
                         cls.ordering_aliases, result_type)
@@ -516,9 +526,11 @@ class QueryCacheBackend11(QueryCacheBackend):
             result = original(cls, result_type)
             if (tables and not sql.startswith('UPDATE') and
                     not sql.startswith('DELETE')):
-                # I think we should always be sending a signal here if we
-                # miss..
-                signals.qc_miss.send(sender=cls, tables=tables,
+
+                if not blacklisted:
+                    # don't send a miss out on blacklist hits, since we never
+                    # looked in the first place, so it wasn't a "miss"
+                    signals.qc_miss.send(sender=cls, tables=tables,
                         query=(sql, params, cls.ordering_aliases),
                         key=key)
                 if hasattr(result, '__iter__'):

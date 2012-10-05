@@ -299,10 +299,24 @@ recommended to use the ``JOHNNY_CACHE`` cache setting instead.
 Signals
 ~~~~~~~
 
-The QuerySet Cache defines two signals:
+The QuerySet Cache defines the following signals:
 
 * ``johnny.cache.signals.qc_hit``, fired after a cache hit
 * ``johnny.cache.signals.qc_miss``, fired after a cache miss
+* ``johnny.cache.signals.qc_skip``, fired when a query misses cache due to
+  table black/whitelisting
+
+**Backwards Compatability Warning**:  prior to johnny-cache 1.4.1, the 
+``qc_miss`` signal was fired whenever a read query was not found in the cache
+for any reason, even due to table blacklisting.  This made it difficult to use
+these signals to collect cache overall performance statistics, because
+blacklisted tables (which would never go to cache even for the table keys) were
+being recorded as misses.
+
+Although this is a semantic change to the meaning of the ``qc_miss`` signal,
+the original behavior was considered buggy and thus it's been changed from
+1.4.0 to 1.4.1.  If the original behavior is desired, please connect both
+the ``qc_miss`` and ``qc_hit`` signals to the same handler.
 
 The sender of these signals is always the ``QueryCacheBackend`` itself.
 

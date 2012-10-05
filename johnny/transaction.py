@@ -64,10 +64,12 @@ class TransactionManager(object):
         return False
 
     def is_managed(self, using=None):
+        if django.VERSION[1] < 2:
+            return django_transaction.is_managed()
         return django_transaction.is_managed(using=using)
 
     def get(self, key, default=None, using=None):
-        if self.is_managed() and self._patched_var:
+        if self.is_managed(using) and self._patched_var:
             val = self.local.get(key, None)
             if val:
                 return val
