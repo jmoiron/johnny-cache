@@ -72,6 +72,13 @@ def disable():
 
 patch,unpatch = enable,disable
 
+def resolve_table(x):
+    """Return a table name for x, where x is either a model instance or a string."""
+    if isinstance(x, basestring):
+        return x
+    return x._meta.db_table
+
+
 def invalidate(*tables, **kwargs):
     """Invalidate the current generation for one or more tables.  The arguments
     can be either strings representing database table names or models.  Pass in
@@ -79,13 +86,8 @@ def invalidate(*tables, **kwargs):
     backend = get_backend()
     db = kwargs.get('using', 'default')
 
-    def resolve(x):
-        if isinstance(x, basestring):
-            return x
-        return x._meta.db_table
-
     if backend._patched:
-        for t in map(resolve, tables):
+        for t in map(resolve_table, tables):
             backend.keyhandler.invalidate_table(t, db)
 
 
@@ -138,7 +140,7 @@ def get_tables_for_query11(query):
         table_re = re.compile(r'(?:FROM|JOIN) `(?P<table>\w+)`')
         return table_re.findall(sql)
 
-    tables = list(query.tables)
+    tables = list(query.table_map)
     if (query.where and query.where.children and
             isinstance(query.where.children[0], WhereNode)):
         where_node = query.where.children[0]
@@ -397,9 +399,13 @@ class QueryCacheBackend(object):
                 #are not populated.
                 tables = [cls.query.model._meta.db_table]
             else:
+                #if cls.query.tables != list(cls.query.table_map):
+                #    pass
+                #tables = list(cls.query.table_map)
                 tables = cls.query.tables
             for table in tables:
-                self.keyhandler.invalidate_table(table, db)
+                if not disallowed_table(table):
+                    self.keyhandler.invalidate_table(table, db)
             return ret
         return newfun
 
@@ -442,15 +448,18 @@ class QueryCacheBackend(object):
 
     def invalidate_m2m(self, instance, **kwargs):
         if self._patched:
-            self.keyhandler.invalidate_table(instance)
+            table = resolve_table(instance)
+            if not disallowed_table(table):
+                self.keyhandler.invalidate_table(instance)
 
     def invalidate(self, instance, **kwargs):
         if self._patched:
-            self.keyhandler.invalidate_table(instance._meta.db_table)
+            table = resolve_table(instance)
+            if not disallowed_table(table):
+                self.keyhandler.invalidate_table(table)
 
             tables = set()
-            tables.add(instance._meta.db_table)
-            self.keyhandler.invalidate_table(instance._meta.db_table)
+            tables.add(table)
 
             try:
                  instance._meta._related_objects_cache
@@ -461,7 +470,8 @@ class QueryCacheBackend(object):
                 obj_table = obj.model._meta.db_table
                 if obj_table not in tables:
                     tables.add(obj_table)
-                    self.keyhandler.invalidate_table(obj_table)
+                    if not disallowed_table(obj_table):
+                        self.keyhandler.invalidate_table(obj_table)
 
     def _handle_signals(self):
         post_save.connect(self.invalidate, sender=None)
@@ -474,6 +484,7 @@ class QueryCacheBackend(object):
         tables = connection.introspection.table_names()
         #seen_models = connection.introspection.installed_models(tables)
         for table in tables:
+            # we want this to just work, so invalidate even things in blacklist
             self.keyhandler.invalidate_table(table)
 
 
@@ -542,7 +553,8 @@ class QueryCacheBackend11(QueryCacheBackend):
             elif tables and sql.startswith('UPDATE'):
                 # issue #1 in bitbucket, not invalidating on update
                 for table in tables:
-                    self.keyhandler.invalidate_table(table)
+                    if not disallowed_table(table):
+                        self.keyhandler.invalidate_table(table)
             return result
         return newfun
 
