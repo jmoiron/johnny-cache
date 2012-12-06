@@ -43,6 +43,17 @@ def disallowed_table(*tables):
         else bool(settings.BLACKLIST.intersection(tables))
 
 
+def is_query_random(query):
+    """
+    Controls every query for the possibility of ORDER BY RAND().
+    """
+    pattern = re.compile('RAND\(\)', re.IGNORECASE)
+    matches = pattern.search(query)
+    if matches:
+        return True
+    return False
+
+
 def get_backend(**kwargs):
     """
     Get's a QueryCacheBackend object for the given options and current
@@ -319,7 +330,6 @@ class QueryCacheBackend(object):
         self._patched = getattr(self, '_patched', False)
 
     def _monkey_select(self, original):
-        from django.db.models.sql import compiler
         from django.db.models.sql.constants import MULTI
         from django.db.models.sql.datastructures import EmptyResultSet
 
@@ -338,8 +348,7 @@ class QueryCacheBackend(object):
                     raise EmptyResultSet
             except EmptyResultSet:
                 if result_type == MULTI:
-                    # this was moved in 1.2 to compiler
-                    return compiler.empty_iter()
+                    return iter([])
                 else:
                     return
 
@@ -354,7 +363,7 @@ class QueryCacheBackend(object):
                 signals.qc_skip.send(sender=cls, tables=tables,
                     query=(sql, params, cls.query.ordering_aliases),
                     key=key)
-            if tables and not blacklisted:
+            if tables and not blacklisted and not is_query_random(cls.as_sql()[0]):
                 gen_key = self.keyhandler.get_generation(*tables, **{'db': db})
                 key = self.keyhandler.sql_key(gen_key, sql, params,
                                               cls.get_ordering(),
@@ -497,7 +506,6 @@ class QueryCacheBackend11(QueryCacheBackend):
     __shared_state = {}
 
     def _monkey_execute_sql(self, original):
-        from django.db.models.sql import query
         from django.db.models.sql.constants import MULTI
         from django.db.models.sql.datastructures import EmptyResultSet
 
@@ -509,7 +517,7 @@ class QueryCacheBackend11(QueryCacheBackend):
                     raise EmptyResultSet
             except EmptyResultSet:
                 if result_type == MULTI:
-                    return query.empty_iter()
+                    return iter([])
                 else:
                     return
 
@@ -521,7 +529,7 @@ class QueryCacheBackend11(QueryCacheBackend):
                     query=(sql, params, cls.ordering_aliases),
                     key=key)
 
-            if tables and not blacklisted:
+            if tables and not blacklisted and not is_query_random(cls.as_sql()[0]):
                 gen_key = self.keyhandler.get_generation(*tables)
                 key = self.keyhandler.sql_key(gen_key, sql, params,
                         cls.ordering_aliases, result_type)
