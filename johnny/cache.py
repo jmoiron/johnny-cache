@@ -319,7 +319,6 @@ class QueryCacheBackend(object):
         self._patched = getattr(self, '_patched', False)
 
     def _monkey_select(self, original):
-        from django.db.models.sql import compiler
         from django.db.models.sql.constants import MULTI
         from django.db.models.sql.datastructures import EmptyResultSet
 
@@ -338,8 +337,7 @@ class QueryCacheBackend(object):
                     raise EmptyResultSet
             except EmptyResultSet:
                 if result_type == MULTI:
-                    # this was moved in 1.2 to compiler
-                    return compiler.empty_iter()
+                    return iter([])
                 else:
                     return
 
@@ -497,7 +495,6 @@ class QueryCacheBackend11(QueryCacheBackend):
     __shared_state = {}
 
     def _monkey_execute_sql(self, original):
-        from django.db.models.sql import query
         from django.db.models.sql.constants import MULTI
         from django.db.models.sql.datastructures import EmptyResultSet
 
@@ -509,7 +506,7 @@ class QueryCacheBackend11(QueryCacheBackend):
                     raise EmptyResultSet
             except EmptyResultSet:
                 if result_type == MULTI:
-                    return query.empty_iter()
+                    return iter([])
                 else:
                     return
 
