@@ -3,10 +3,18 @@
 
 """Test models for Johnny-Cache"""
 
+import django
 from django.db import models
 from django.db.models import permalink
 from django.conf import settings
 from django.utils.translation import ugettext_lazy as _
+
+def get_urlfield(*args, **kwargs):
+    if django.VERSION >= 1.4 and 'verify_exists' in kwargs:
+        del kwargs['verify_exists']
+        return models.URLField(*args, **kwargs)
+    return models.URLField(*args, **kwargs)
+
 
 #from basic.people.models import Person
 
@@ -59,7 +67,7 @@ class Person(models.Model):
     mugshot_credit = models.CharField(_('mugshot credit'), blank=True, max_length=200)
     birth_date = models.DateField(_('birth date'), blank=True, null=True)
     person_types = models.ManyToManyField(PersonType, blank=True)
-    website = models.URLField(_('website'), blank=True, verify_exists=True)
+    website = get_urlfield(_('website'), blank=True, verify_exists=True)
 
     class Meta:
         verbose_name = _('person')
@@ -99,7 +107,7 @@ class Publisher(models.Model):
     title = models.CharField(max_length=100)
     prefix = models.CharField(max_length=20, blank=True)
     slug = models.SlugField(unique=True)
-    website = models.URLField(blank=True, verify_exists=False)
+    website = get_urlfield(blank=True, verify_exists=False)
 
     class Meta:
         ordering = ('title',)

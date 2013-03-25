@@ -7,6 +7,7 @@ local_settings.py
 *.swp
 *.swo
 *.egg-info*
+.tox
 docs/_build*
 build
 dist

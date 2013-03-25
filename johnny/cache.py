@@ -18,6 +18,7 @@ from transaction import TransactionManager
 import django
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models.signals import post_save, post_delete
+from django.db.models.sql import compiler
 
 try:
     any
@@ -29,7 +30,20 @@ except NameError:
                 return True
         return False
 
+class NotInCache(object):
+    #This is used rather than None to properly cache empty querysets
+    pass
+
+no_result_sentinel = "22c52d96-156a-4638-a38d-aae0051ee9df"
 local = localstore.LocalStore()
+
+def empty_iter():
+    #making this a function as the empty_iter has changed between 1.4 and 1.5
+    if django.VERSION[:2] >= (1, 5):
+        return iter([])
+    else:
+        return compiler.empty_iter()
+
 
 def disallowed_table(*tables):
     """Returns True if a set of tables is in the blacklist or, if a whitelist is set,
@@ -50,13 +64,7 @@ def get_backend(**kwargs):
     created previously, ``get_backend`` returns that.  Otherwise,
     ``get_backend`` will return the default backend.
     """
-    if django.VERSION[:2] == (1, 1):
-        cls = QueryCacheBackend11
-    elif django.VERSION[:2] > (1, 1):
-        cls = QueryCacheBackend
-    else:
-        raise ImproperlyConfigured(
-            "Johnny doesn't work on this version of Django.")
+    cls = QueryCacheBackend
     return cls(**kwargs)
 
 def enable():
@@ -117,39 +125,6 @@ def get_tables_for_query(query):
         for node in where_nodes:
             tables += get_tables(node, tables)
 
-    return list(set(tables))
-
-
-def get_tables_for_query11(query):
-    """
-    Takes a django BaseQuery object and tries to return all tables that will
-    be used in that query as a list.  Unfortunately, the where clauses give us
-    "QueryWrapper" instead of "QuerySet" objects, so we have to parse SQL once
-    we get down to a certain layer to get the tables we are using.  This is
-    meant for use in Django 1.1.x only!  Later versions can use the above.
-    """
-    from django.db.models.sql.where import WhereNode
-    from django.db.models.query_utils import QueryWrapper
-
-    def parse_tables_from_sql(sql):
-        """
-        This attempts to parse tables out of sql.  Django's SQL compiler is
-        highly regular and always uses extended SQL forms like 'INNER JOIN'
-        instead of ','.  This probably needs a lot of testing for different
-        backends and is not guaranteed to work on a custom backend."""
-        table_re = re.compile(r'(?:FROM|JOIN) `(?P<table>\w+)`')
-        return table_re.findall(sql)
-
-    tables = list(query.table_map)
-    if (query.where and query.where.children and
-            isinstance(query.where.children[0], WhereNode)):
-        where_node = query.where.children[0]
-        for child in where_node.children:
-            if isinstance(child, WhereNode):
-                continue
-            for item in child:
-                if isinstance(item, QueryWrapper):
-                    tables += parse_tables_from_sql(item.data[0])
     return list(set(tables))
 
 
@@ -319,7 +294,6 @@ class QueryCacheBackend(object):
         self._patched = getattr(self, '_patched', False)
 
     def _monkey_select(self, original):
-        from django.db.models.sql import compiler
         from django.db.models.sql.constants import MULTI
         from django.db.models.sql.datastructures import EmptyResultSet
 
@@ -339,12 +313,12 @@ class QueryCacheBackend(object):
             except EmptyResultSet:
                 if result_type == MULTI:
                     # this was moved in 1.2 to compiler
-                    return compiler.empty_iter()
+                    return empty_iter()
                 else:
                     return
 
             db = getattr(cls, 'using', 'default')
-            key, val = None, None
+            key, val = None, NotInCache()
             # check the blacklist for any of the involved tables;  if it's not
             # there, then look for the value in the cache.
             tables = get_tables_for_query(cls.query)
@@ -359,9 +333,12 @@ class QueryCacheBackend(object):
                 key = self.keyhandler.sql_key(gen_key, sql, params,
                                               cls.get_ordering(),
                                               result_type, db)
-                val = self.cache_backend.get(key, None, db)
+                val = self.cache_backend.get(key, NotInCache(), db)
 
-            if val is not None:
+            if not isinstance(val, NotInCache):
+                if val == no_result_sentinel:
+                    val = []
+
                 signals.qc_hit.send(sender=cls, tables=tables,
                         query=(sql, params, cls.query.ordering_aliases),
                         size=len(val), key=key)
@@ -381,7 +358,10 @@ class QueryCacheBackend(object):
                 #todo - create a smart iterable wrapper
                 val = list(val)
             if key is not None:
-                self.cache_backend.set(key, val, settings.MIDDLEWARE_SECONDS, db)
+                if not val:
+                    self.cache_backend.set(key, no_result_sentinel, settings.MIDDLEWARE_SECONDS, db)
+                else:
+                    self.cache_backend.set(key, val, settings.MIDDLEWARE_SECONDS, db)
             return val
         return newfun
 
@@ -486,118 +466,3 @@ class QueryCacheBackend(object):
         for table in tables:
             # we want this to just work, so invalidate even things in blacklist
             self.keyhandler.invalidate_table(table)
-
-
-class QueryCacheBackend11(QueryCacheBackend):
-    """
-    This is the 1.1.x version of the QueryCacheBackend.  In Django1.1, we
-    patch django.db.models.sql.query.Query.execute_sql to implement query
-    caching.  Usage across QueryCacheBackends is identical.
-    """
-    __shared_state = {}
-
-    def _monkey_execute_sql(self, original):
-        from django.db.models.sql import query
-        from django.db.models.sql.constants import MULTI
-        from django.db.models.sql.datastructures import EmptyResultSet
-
-        @wraps(original, assigned=available_attrs(original))
-        def newfun(cls, result_type=MULTI):
-            try:
-                sql, params = cls.as_sql()
-                if not sql:
-                    raise EmptyResultSet
-            except EmptyResultSet:
-                if result_type == MULTI:
-                    return query.empty_iter()
-                else:
-                    return
-
-            val, key = None, None
-            tables = get_tables_for_query11(cls)
-            blacklisted = disallowed_table(*tables)
-            if blacklisted:
-                signals.qc_skip.send(sender=cls, tables=tables,
-                    query=(sql, params, cls.ordering_aliases),
-                    key=key)
-
-            if tables and not blacklisted:
-                gen_key = self.keyhandler.get_generation(*tables)
-                key = self.keyhandler.sql_key(gen_key, sql, params,
-                        cls.ordering_aliases, result_type)
-                val = self.cache_backend.get(key, None)
-
-                if val is not None:
-                    signals.qc_hit.send(sender=cls, tables=tables,
-                            query=(sql, params, cls.ordering_aliases),
-                            size=len(val), key=key)
-                    return val
-
-            # we didn't find the value in the cache, so execute the query
-            result = original(cls, result_type)
-            if (tables and not sql.startswith('UPDATE') and
-                    not sql.startswith('DELETE')):
-
-                if not blacklisted:
-                    # don't send a miss out on blacklist hits, since we never
-                    # looked in the first place, so it wasn't a "miss"
-                    signals.qc_miss.send(sender=cls, tables=tables,
-                        query=(sql, params, cls.ordering_aliases),
-                        key=key)
-                if hasattr(result, '__iter__'):
-                    result = list(result)
-                # 'key' will be None here if any of these tables were
-                # blacklisted, in which case we just don't care.
-                if key is not None:
-                    self.cache_backend.set(key, result)
-            elif tables and sql.startswith('UPDATE'):
-                # issue #1 in bitbucket, not invalidating on update
-                for table in tables:
-                    if not disallowed_table(table):
-                        self.keyhandler.invalidate_table(table)
-            return result
-        return newfun
-
-    def patch(self):
-        from django.db.models import sql
-        from django.db.models.fields import related
-        if self._patched:
-            return
-        self._original = sql.Query.execute_sql
-        self._original_m2m = related.create_many_related_manager
-        sql.Query.execute_sql = self._monkey_execute_sql(
-            sql.Query.execute_sql)
-        related.create_many_related_manager = self._patched_m2m(
-            related.create_many_related_manager)
-        self._handle_signals()
-        self.cache_backend.patch()
-        self._patched = True
-
-    def unpatch(self):
-        from django.db.models import sql
-        if not self._patched:
-            return
-        sql.Query.execute_sql = self._original
-        self.cache_backend.unpatch()
-        self._patched = False
-
-    def _patched_m2m_func(self, original):
-        def f(cls, *args, **kwargs):
-            val = original(cls, *args, **kwargs)
-            signals.qc_m2m_change.send(
-                sender=cls, instance=cls.join_table.strip('"').strip('`'))
-            return val
-        return f
-
-    def _patched_m2m(self, original):
-        def f(*args, **kwargs):
-            related_manager = original(*args, **kwargs)
-            if getattr(related_manager, '_johnny_patched', None):
-                return related_manager
-            for i in ('add', 'remove', 'clear'):
-                item = '_%s_items' % i
-                setattr(related_manager, item,
-                        self._patched_m2m_func(getattr(related_manager, item)))
-            related_manager._johnny_patched = True
-            return related_manager
-        return f
