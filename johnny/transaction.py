@@ -40,28 +40,17 @@ class TransactionManager(object):
         if 'trans_sids' not in self.local:
             self.local['trans_sids'] = {}
         d = self.local['trans_sids']
-        if self.has_multi_db():
-            if using is None:
-                using = DEFAULT_DB_ALIAS
-        else:
-            using = 'default'
+        if using is None:
+            using = DEFAULT_DB_ALIAS
         if using not in d:
             d[using] = []
         return d[using]
 
     def _clear_sid_stack(self, using=None):
-        if self.has_multi_db():
-            if using is None:
-                using = DEFAULT_DB_ALIAS
-        else:
-            using = 'default'
+        if using is None:
+            using = DEFAULT_DB_ALIAS
         if using in self.local.get('trans_sids', {}):
             del self.local['trans_sids']
-
-    def has_multi_db(self):
-        if django.VERSION[:2] > (1, 1):
-            return True
-        return False
 
     def is_managed(self, using=None):
         if django.VERSION[1] < 2:
@@ -88,11 +77,8 @@ class TransactionManager(object):
                 return self.local[sid][key]
 
     def _trunc_using(self, using):
-        if self.has_multi_db():
-            if using is None:
-                using = DEFAULT_DB_ALIAS
-        else:
-            using = 'default'
+        if using is None:
+            using = DEFAULT_DB_ALIAS
         if len(using) > 100:
             using = using[0:68] + self.keygen.gen_key(using[68:])
         return using
@@ -112,11 +98,8 @@ class TransactionManager(object):
             self.cache_backend.set(key, val, timeout)
 
     def _clear(self, using=None):
-        if self.has_multi_db():
-            self.local.clear('%s_%s_*' %
-                             (self.prefix, self._trunc_using(using)))
-        else:
-            self.local.clear('%s_*' % self.prefix)
+        self.local.clear('%s_%s_*' %
+                         (self.prefix, self._trunc_using(using)))
 
     def _flush(self, commit=True, using=None):
         """
@@ -126,11 +109,8 @@ class TransactionManager(object):
             # XXX: multi-set?
             if self._uses_savepoints():
                 self._commit_all_savepoints(using)
-            if self.has_multi_db():
-                c = self.local.mget('%s_%s_*' %
-                                    (self.prefix, self._trunc_using(using)))
-            else:
-                c = self.local.mget('%s_*' % self.prefix)
+            c = self.local.mget('%s_%s_*' %
+                                (self.prefix, self._trunc_using(using)))
             for key, value in c.iteritems():
                 self.cache_backend.set(key, value, self.timeout)
         else:
@@ -146,17 +126,7 @@ class TransactionManager(object):
             original(using=using)
             self._flush(commit=commit, using=using)
 
-        @wraps(original, assigned=available_attrs(original))
-        def newfun11():
-            #1.1 version
-            original()
-            self._flush(commit=commit)
-
-        if django.VERSION[:2] == (1, 1):
-            return newfun11
-        elif django.VERSION[:2] > (1, 1):
-            return newfun
-        return original
+        return newfun
 
     def _uses_savepoints(self):
         return connection.features.uses_savepoints
@@ -175,11 +145,8 @@ class TransactionManager(object):
         key = self._sid_key(sid, using)
 
         #get all local dirty items
-        if self.has_multi_db():
-            c = self.local.mget('%s_%s_*' %
-                                (self.prefix, self._trunc_using(using)))
-        else:
-            c = self.local.mget('%s_*' % self.prefix)
+        c = self.local.mget('%s_%s_*' %
+                            (self.prefix, self._trunc_using(using)))
         #store them to a dictionary in the localstore
         if key not in self.local:
             self.local[key] = {}
@@ -242,11 +209,8 @@ class TransactionManager(object):
             self._rollback_savepoint(sids[0], using)
 
     def _store_dirty(self, using=None):
-        if self.has_multi_db():
-            c = self.local.mget('%s_%s_*' %
-                                (self.prefix, self._trunc_using(using)))
-        else:
-            c = self.local.mget('%s_*' % self.prefix)
+        c = self.local.mget('%s_%s_*' %
+                            (self.prefix, self._trunc_using(using)))
         backup = 'trans_dirty_store_%s' % self._trunc_using(using)
         self.local[backup] = {}
         for k, v in c.iteritems():

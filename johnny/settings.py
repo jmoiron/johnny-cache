@@ -12,11 +12,8 @@ BLACKLIST = set(BLACKLIST)
 
 WHITELIST = set(getattr(settings, 'JOHNNY_TABLE_WHITELIST', []))
 
-if django.VERSION[1] >= 2:
-    DB_CACHE_KEYS = dict((name, db.get('JOHNNY_CACHE_KEY', name))
-                     for name, db in settings.DATABASES.iteritems())
-else:
-    DB_CACHE_KEYS = {'default': 'default'}
+DB_CACHE_KEYS = dict((name, db.get('JOHNNY_CACHE_KEY', name))
+                 for name, db in settings.DATABASES.iteritems())
 
 MIDDLEWARE_KEY_PREFIX = getattr(settings, 'JOHNNY_MIDDLEWARE_KEY_PREFIX', 'jc')
 
