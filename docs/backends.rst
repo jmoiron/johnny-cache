@@ -11,6 +11,7 @@ memcached
 .. automodule:: johnny.backends.memcached
 .. autoclass:: johnny.backends.memcached.MemcachedCache
 .. autoclass:: johnny.backends.memcached.PyLibMCCache
+.. autoclass:: johnny.backends.memcached.FailSilentlyMemcachedCache
 
 locmem
 ~~~~~~

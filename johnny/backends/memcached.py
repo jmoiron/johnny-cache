@@ -5,6 +5,8 @@ of 0.  For Django >= 1.3, this module also provides ``MemcachedCache`` and
 django's default backend modules.
 """
 
+import logging
+
 import django
 from django.core.cache.backends import memcached
 
@@ -45,3 +47,17 @@ if django.VERSION[:2] > (1, 2):
             if timeout == 0:
                 return 2591999
             return super(PyLibMCCache, self)._get_memcache_timeout(timeout)
+
+    class FailSilentlyMemcachedCache(MemcachedCache):
+        """
+        It may happen that we're trying to cache something bigger that the
+        max allowed per key on memcached. Instead of failing with a ValueError
+        exception, this backend allows to ignore that, even if it means
+        not to store the cached value, but at least the application will
+        keep working.
+        """
+        def set(self, *args, **kwargs):
+            try:
+                super(FailSilentlyMemcachedCache, self).set(*args, **kwargs)
+            except ValueError:
+                logging.warning("Couldn't set the key for the cache")
