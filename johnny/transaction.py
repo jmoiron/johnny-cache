@@ -137,7 +137,7 @@ class TransactionManager(object):
         else:
             prefix = 'trans_savepoint'
 
-        if sid.startswith(prefix):
+        if sid is not None and sid.startswith(prefix):
             return sid
         return '%s_%s'%(prefix, sid)
 
