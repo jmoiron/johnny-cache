@@ -190,7 +190,7 @@ class TransactionManager(object):
                 stack.insert(0, popped)
             self._store_dirty(using)
             for i in stack:
-                for k, v in self.local[i].iteritems():
+                for k, v in self.local.get(i, {}).iteritems():
                     self.local[k] = v
                 del self.local[i]
             self._restore_dirty(using)
