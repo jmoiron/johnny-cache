@@ -119,12 +119,15 @@ class TransactionManager(object):
         self._clear(using)
         self._clear_sid_stack(using)
 
-    def _patched(self, original, commit=True):
+    def _patched(self, original, commit=True, unless_managed=False):
         @wraps(original, assigned=available_attrs(original))
         def newfun(using=None):
             #1.2 version
             original(using=using)
-            self._flush(commit=commit, using=using)
+            # copying behavior of original func
+            # if it is an 'unless_managed' version we should do nothing if transaction is managed
+            if not unless_managed or not self.is_managed(using=using):
+                self._flush(commit=commit, using=using)
 
         return newfun
 
@@ -269,12 +272,18 @@ class TransactionManager(object):
         """
         if not self._patched_var:
             self._originals['rollback'] = self._getreal('rollback')
+            self._originals['rollback_unless_managed'] = self._getreal('rollback_unless_managed')
             self._originals['commit'] = self._getreal('commit')
+            self._originals['commit_unless_managed'] = self._getreal('commit_unless_managed')
             self._originals['savepoint'] = self._getreal('savepoint')
             self._originals['savepoint_rollback'] = self._getreal('savepoint_rollback')
             self._originals['savepoint_commit'] = self._getreal('savepoint_commit')
             django_transaction.rollback = self._patched(django_transaction.rollback, False)
+            django_transaction.rollback_unless_managed = self._patched(django_transaction.rollback_unless_managed,
+                                                                       False, unless_managed=True)
             django_transaction.commit = self._patched(django_transaction.commit, True)
+            django_transaction.commit_unless_managed = self._patched(django_transaction.commit_unless_managed,
+                                                                     True, unless_managed=True)
             django_transaction.savepoint = self._savepoint(django_transaction.savepoint)
             django_transaction.savepoint_rollback = self._savepoint_rollback(django_transaction.savepoint_rollback)
             django_transaction.savepoint_commit = self._savepoint_commit(django_transaction.savepoint_commit)
