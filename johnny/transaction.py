@@ -126,7 +126,7 @@ class TransactionManager(object):
             original(using=using)
             # copying behavior of original func
             # if it is an 'unless_managed' version we should do nothing is transaction is managed
-            if not unless_managed or not django_transaction.is_managed():
+            if not unless_managed or not self.is_managed(using=using):
                 self._flush(commit=commit, using=using)
 
         return newfun
