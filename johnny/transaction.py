@@ -125,7 +125,7 @@ class TransactionManager(object):
             #1.2 version
             original(using=using)
             # copying behavior of original func
-            # if it is an 'unless_managed' version we should do nothing is transaction is managed
+            # if it is an 'unless_managed' version we should do nothing if transaction is managed
             if not unless_managed or not self.is_managed(using=using):
                 self._flush(commit=commit, using=using)
 
