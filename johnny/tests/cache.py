@@ -769,6 +769,37 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         transaction.managed(False)
         transaction.leave_transaction_management()
 
+    def test_transaction_commit_unless_managed(self):
+        """
+        Test 'commit unless managed' support in Johnny
+
+        Tests bugfix provided in PR#34
+        """
+        # 1st condition - patch Django transaction
+        from johnny import cache
+        cache.patch()
+
+        # 2nd condition to reproduce the bug - work in auto-commit mode
+        from django.db import transaction
+        if transaction.is_managed(using='default'):
+            transaction.leave_transaction_management(using='default')
+
+        from testapp.models import Issue24Model
+
+        # Simulating situation when there are 'dirty savepoints'
+        # It is similar to behavior of django.contrib.sessions.backends.db.SessionStore#save
+        transaction.savepoint(using='default')
+
+        model_1 = Issue24Model(one=1, two=1)
+        model_1.save(using='default')  # Calls transaction.commit_unless_managed
+
+        Issue24Model.objects.get_or_create(one=2, two=2)  # Creates and commits savepoint
+
+        try:
+            Issue24Model.objects.all().delete()
+        except KeyError:
+            self.fail("Savepoints collision due to unpatched 'transaction.commit_unless_managed'!")
+
     def test_transaction_rollback(self):
         """Tests johnny's handling of transaction rollbacks.
 
