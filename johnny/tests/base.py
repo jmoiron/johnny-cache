@@ -136,9 +136,8 @@ class message_queue(object):
 def supports_transactions(con):
     """A convenience function which will work across multiple django versions
     that checks whether or not a connection supports transactions."""
-    vendor = con.vendor
     if getattr(con.features, "supports_transactions", False):
-        if vendor == "mysql" and not getattr(con.features, '_storage_engine', '') == "InnoDB":
+        if con.vendor == "mysql" and not getattr(con.features, '_storage_engine', '') == "InnoDB":
             print "MySQL connection reports transactions supported but storage engine != InnoDB."
             return False
         return True
