@@ -326,7 +326,7 @@ class QueryCacheBackend(object):
             blacklisted = disallowed_table(*tables)
             if blacklisted:
                 signals.qc_skip.send(sender=cls, tables=tables,
-                    query=(sql, params, cls.query.ordering_aliases),
+                    query=(sql, params, cls.ordering_aliases),
                     key=key)
             if tables and not blacklisted:
                 gen_key = self.keyhandler.get_generation(*tables, **{'db': db})
@@ -340,13 +340,13 @@ class QueryCacheBackend(object):
                     val = []
 
                 signals.qc_hit.send(sender=cls, tables=tables,
-                        query=(sql, params, cls.query.ordering_aliases),
+                        query=(sql, params, cls.ordering_aliases),
                         size=len(val), key=key)
                 return val
 
             if not blacklisted:
                 signals.qc_miss.send(sender=cls, tables=tables,
-                    query=(sql, params, cls.query.ordering_aliases),
+                    query=(sql, params, cls.ordering_aliases),
                     key=key)
 
             val = original(cls, *args, **kwargs)
