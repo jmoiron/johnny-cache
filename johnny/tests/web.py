@@ -4,7 +4,7 @@
 """Tests for the QueryCache functionality of johnny."""
 
 from django.conf import settings
-from django.db import connection
+from django.db import connection, transaction
 from johnny import middleware
 import django
 import base
@@ -65,8 +65,14 @@ class TestJohnnyTransactionMiddleware(base.TransactionJohnnyWebTestCase):
         'django.middleware.locale.LocaleMiddleware',
         'django.middleware.gzip.GZipMiddleware',
         'django.middleware.http.ConditionalGetMiddleware',
-        'johnny.middleware.CommittingTransactionMiddleware',
     )
+    if django.VERSION < (1,6):
+        middleware += (
+            'johnny.middleware.CommittingTransactionMiddleware',
+        )
+    def setUp(self):
+        super(TestJohnnyTransactionMiddleware, self).setUp()
+        transaction.set_autocommit(True)
 
     def test_queries_from_templates(self):
         """Verify that doing the same request w/o a db write twice *does*

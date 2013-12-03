@@ -6,6 +6,7 @@ try:
 except:
     DEFUALT_DB_ALIAS = None
 
+from johnny import settings
 from johnny.decorators import wraps, available_attrs
 
 
@@ -79,6 +80,7 @@ class TransactionManager(object):
     def _trunc_using(self, using):
         if using is None:
             using = DEFAULT_DB_ALIAS
+        using = settings.DB_CACHE_KEYS[using]
         if len(using) > 100:
             using = using[0:68] + self.keygen.gen_key(using[68:])
         return using
@@ -159,7 +161,8 @@ class TransactionManager(object):
         self._clear(using)
         #append the key to the savepoint stack
         sids = self._get_sid(using)
-        sids.append(key)
+        if key not in sids:
+            sids.append(key)
 
     def _rollback_savepoint(self, sid, using=None):
         sids = self._get_sid(using)
@@ -193,7 +196,7 @@ class TransactionManager(object):
                 stack.insert(0, popped)
             self._store_dirty(using)
             for i in stack:
-                for k, v in self.local[i].iteritems():
+                for k, v in self.local.get(i, {}).iteritems():
                     self.local[k] = v
                 del self.local[i]
             self._restore_dirty(using)

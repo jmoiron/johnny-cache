@@ -59,21 +59,12 @@ if django.VERSION[:2] < (1, 3):
     #CACHE_BACKEND="johnny.backends.locmem://"
     CACHE_BACKEND="johnny.backends.memcached://localhost:11211/"
     #CACHE_BACKEND="johnny.backends.filebased:///tmp/johnny_cache.cc"
-elif django.VERSION[:2] < (1,6):
-    CACHES = {
-        'default' : {
-            'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
-            #'BACKEND': 'johnny.backends.memcached.MemcachedCache',
-            'LOCATION': ['localhost:11211'],
-            'JOHNNY_CACHE': True,
-        }
-    }
 else:
     #CACHES = { 'default' : { 'BACKEND': 'johnny.backends.locmem.LocMemCache' }}
     CACHES = {
         'default' : {
-            #'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
-            'BACKEND': 'johnny.backends.memcached.MemcachedCache',
+            'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
+            #'BACKEND': 'johnny.backends.memcached.MemcachedCache',
             'LOCATION': ['localhost:11211'],
             'JOHNNY_CACHE': True,
         }
@@ -113,11 +104,12 @@ TEMPLATE_DIRS = (
 
 INSTALLED_APPS = (
     #'django.contrib.auth',
-    'django.contrib.sessions',
+    #'django.contrib.sessions',
     #'django.contrib.sites',
     'johnny',
-    'johnny.tests',
 )
+
+LOGGING_CONFIG=None
 
 try:
     from local_settings import *
@@ -128,3 +120,4 @@ except ImportError:
 lcls = locals()
 if 'DATABASES' in lcls and len(lcls['DATABASES']) > 1:
     DATABASE_ROUTERS = ['routers.MultiSyncedRouter']
+

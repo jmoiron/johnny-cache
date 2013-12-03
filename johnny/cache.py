@@ -105,6 +105,45 @@ def get_tables_for_query(query):
     that query as a list.  Note that where clauses can have their own
     querysets with their own dependent queries, etc.
     """
+    from django.db.models.sql.where import WhereNode, SubqueryConstraint
+    from django.db.models.query import QuerySet
+    tables = [v[0] for v in getattr(query,'alias_map',{}).values()]
+
+    def get_sub_query_tables(node):
+        query = node.query_object
+        if not hasattr(query, 'field_names'):
+            query = query.values(*node.targets)
+        else:
+            query = query._clone()
+        query = query.query
+        return [v[0] for v in getattr(query, 'alias_map',{}).values()]
+
+    def get_tables(node, tables):
+        if isinstance(node, SubqueryConstraint):
+            return get_sub_query_tables(node)
+        for child in node.children:
+            if isinstance(child, WhereNode):  # and child.children:
+                tables = get_tables(child, tables)
+            elif not hasattr(child, '__iter__'):
+                continue
+            else:
+                for item in (c for c in child if isinstance(c, QuerySet)):
+                    tables += get_tables_for_query(item.query)
+        return tables
+
+    if query.where and query.where.children:
+        where_nodes = [c for c in query.where.children if isinstance(c, (WhereNode, SubqueryConstraint))]
+        for node in where_nodes:
+            tables += get_tables(node, tables)
+
+    return list(set(tables))
+
+def get_tables_for_query_pre_16(query):
+    """
+    Takes a Django 'query' object and returns all tables that will be used in
+    that query as a list.  Note that where clauses can have their own
+    querysets with their own dependent queries, etc.
+    """
     from django.db.models.sql.where import WhereNode
     from django.db.models.query import QuerySet
     tables = [v[0] for v in getattr(query,'alias_map',{}).values()]
@@ -321,12 +360,17 @@ class QueryCacheBackend(object):
             key, val = None, NotInCache()
             # check the blacklist for any of the involved tables;  if it's not
             # there, then look for the value in the cache.
-            tables = get_tables_for_query(cls.query)
+            if django.VERSION[:2] < (1,6):
+                tables = get_tables_for_query_pre_16(cls.query)
+            else:
+                tables = get_tables_for_query(cls.query)
             # if the tables are blacklisted, send a qc_skip signal
             blacklisted = disallowed_table(*tables)
+            #TODO - remove this when cls.query.ordering_aliases is depracated
+            ordering_aliases = getattr(cls, 'ordering_aliases', []) + getattr(cls.query, 'ordering_aliases', [])
             if blacklisted:
                 signals.qc_skip.send(sender=cls, tables=tables,
-                    query=(sql, params, cls.query.ordering_aliases),
+                    query=(sql, params, ordering_aliases),
                     key=key)
             if tables and not blacklisted:
                 gen_key = self.keyhandler.get_generation(*tables, **{'db': db})
@@ -340,13 +384,13 @@ class QueryCacheBackend(object):
                     val = []
 
                 signals.qc_hit.send(sender=cls, tables=tables,
-                        query=(sql, params, cls.query.ordering_aliases),
+                        query=(sql, params, ordering_aliases),
                         size=len(val), key=key)
                 return val
 
             if not blacklisted:
                 signals.qc_miss.send(sender=cls, tables=tables,
-                    query=(sql, params, cls.query.ordering_aliases),
+                    query=(sql, params, ordering_aliases),
                     key=key)
 
             val = original(cls, *args, **kwargs)

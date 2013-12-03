@@ -10,6 +10,8 @@ try:
     from django.db import connections
 except:
     connections = None
+
+from django.db import transaction
 from johnny import middleware
 from johnny import settings as johnny_settings
 import base
@@ -21,6 +23,12 @@ except NameError:
         for i in iterable:
             if i: return True
         return False
+
+if django.VERSION[:2] < (1,6):
+    def atomic(f):
+        return f
+else:
+    from django.db.transaction import atomic
 
 # put tests in here to be included in the testing suite
 __all__ = ['MultiDbTest', 'SingleModelTest', 'MultiModelTest', 'TransactionSupportTest', 'BlackListTest', 'TransactionManagerTestCase']
@@ -52,6 +60,8 @@ class TransactionQueryCacheBase(base.TransactionJohnnyTestCase):
         from django.db import transaction
         _post_teardown(self)
         super(TransactionQueryCacheBase, self)._post_teardown()
+        if transaction.is_dirty():
+            transaction.rollback()
         if transaction.is_managed():
             transaction.managed(False)
 
@@ -76,7 +86,7 @@ class BlackListTest(QueryCacheBase):
 
 class MultiDbTest(TransactionQueryCacheBase):
     multi_db = True
-    fixtures = ['genres.json', 'genres.second.json']
+    fixtures = ['genres.json', 'genres2.json']
 
     def _run_threaded(self, query, queue):
         """Runs a query (as a string) from testapp in another thread and
@@ -714,6 +724,10 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         t.start()
         t.join()
 
+    def setUp(self):
+        super(TransactionSupportTest, self).setUp()
+        transaction.set_autocommit(True)
+
     def tearDown(self):
         from django.db import transaction
         if transaction.is_managed():
@@ -843,6 +857,7 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         transaction.managed(False)
         transaction.leave_transaction_management()
 
+    @atomic
     def test_savepoint_rollback(self):
         """Tests rollbacks of savepoints"""
         from django.db import transaction
@@ -850,12 +865,13 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         from johnny import cache
         if not connection.features.uses_savepoints:
             return
-        self.failUnless(transaction.is_managed() == False)
-        self.failUnless(transaction.is_dirty() == False)
+        if django.VERSION[:2] < (1,6):
+            self.failUnless(transaction.is_managed() == False)
+            self.failUnless(transaction.is_dirty() == False)
         connection.queries = []
         cache.local.clear()
-        transaction.enter_transaction_management()
-        transaction.managed()
+        if django.VERSION[:2] < (1,6):
+            transaction.enter_transaction_management()
         g = Genre.objects.get(pk=1)
         start_title = g.title
         g.title = "Adventures in Savepoint World"
@@ -873,8 +889,8 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         transaction.rollback()
         g = Genre.objects.get(pk=1)
         self.failUnless(g.title == start_title)
-        transaction.managed(False)
-        transaction.leave_transaction_management()
+        if django.VERSION[:2] < (1,6):
+            transaction.leave_transaction_management()
 
     def test_savepoint_commit(self):
         """Tests a transaction commit (release)
