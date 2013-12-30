@@ -118,7 +118,7 @@ def get_tables_for_query(query):
             else:
                 for item in (c for c in child if isinstance(c, QuerySet)):
                     tables += get_tables_for_query(item.query)
-        return tables
+        return list(set(tables))
 
     if query.where and query.where.children:
         where_nodes = [c for c in query.where.children if isinstance(c, WhereNode)]
