@@ -177,23 +177,43 @@ class KeyGen(object):
         return '%s_%s_multi_%s' % (self.prefix, db, self.gen_key(*values))
 
     @staticmethod
+    def _add_separator(iterable, separator):
+        """Given an iterable, return a generator where every value is
+        separated by the separator given.
+
+        >>> list(KeyGen._add_separator([1, 2, 3], 0))
+        [1, 0, 2, 0, 3]
+
+        """
+        it = iter(iterable)
+        yield next(it)
+        for item in it:
+            yield separator
+            yield item
+
+    @staticmethod
     def _convert(x):
         if isinstance(x, unicode):
             return x.encode('utf-8')
         return str(x)
 
     @staticmethod
-    def _recursive_convert(x, key):
-        for item in x:
+    def _flatten(nested_list):
+        """Return a generator where nested lists or tuples are flattened."""
+        for item in nested_list:
             if isinstance(item, (tuple, list)):
-                KeyGen._recursive_convert(item, key)
+                for subitem in KeyGen._flatten(item):
+                    yield subitem
             else:
-                key.update(KeyGen._convert(item))
+                yield item
 
     def gen_key(self, *values):
         """Generate a key from one or more values."""
         key = md5()
-        KeyGen._recursive_convert(values, key)
+
+        for item in KeyGen._add_separator(KeyGen._flatten(values), "S"):
+            key.update(KeyGen._convert(item))
+        
         return key.hexdigest()
 
 
