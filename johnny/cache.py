@@ -183,17 +183,22 @@ class KeyGen(object):
         return str(x)
 
     @staticmethod
-    def _recursive_convert(x, key):
-        for item in x:
+    def _flatten(nested_list):
+        """Return a generator where nested lists or tuples are flattened."""
+        for item in nested_list:
             if isinstance(item, (tuple, list)):
-                KeyGen._recursive_convert(item, key)
+                for subitem in KeyGen._flatten(item):
+                    yield subitem
             else:
-                key.update(KeyGen._convert(item))
+                yield item
 
     def gen_key(self, *values):
         """Generate a key from one or more values."""
         key = md5()
-        KeyGen._recursive_convert(values, key)
+
+        for item in KeyGen._flatten(values):
+            key.update(KeyGen._convert(item))
+        
         return key.hexdigest()
 
 
