@@ -23,7 +23,9 @@ except NameError:
         return False
 
 # put tests in here to be included in the testing suite
-__all__ = ['MultiDbTest', 'SingleModelTest', 'MultiModelTest', 'TransactionSupportTest', 'BlackListTest', 'TransactionManagerTestCase']
+__all__ = ['MultiDbTest', 'SingleModelTest', 'MultiModelTest',
+           'TransactionSupportTest', 'BlackListTest',
+           'TransactionManagerTestCase', 'PrefixParamsTestCase']
 
 def _pre_setup(self):
     self.saved_DISABLE_SETTING = getattr(johnny_settings, 'DISABLE_QUERYSET_CACHE', False)
@@ -961,3 +963,20 @@ class TransactionManagerTestCase(base.TransactionJohnnyTestCase):
         tm._commit_all_savepoints()
         # And this checks if it actually happened.
         self.failUnless(table_key in tm.local)
+
+
+class PrefixParamsTestCase(QueryCacheBase):
+    def test_params_prefixes(self):
+        """Ensure we don't return incorrect results when queryset parameters
+        happen to concatenate to the correct value.
+
+        """
+        from testapp.models import User
+
+        User.objects.create(first_name="foo", last_name="bar")
+        User.objects.create(first_name="foob", last_name="ar")
+
+        u1 = User.objects.get(first_name="foo", last_name="bar")
+        u2 = User.objects.get(first_name="foob", last_name="ar")
+
+        self.assertNotEqual(u1, u2)
