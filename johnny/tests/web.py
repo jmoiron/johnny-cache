@@ -3,9 +3,7 @@
 
 """Tests for the QueryCache functionality of johnny."""
 
-from django.conf import settings
 from django.db import connection
-from johnny import middleware
 import django
 import base
 

@@ -60,7 +60,6 @@ class BlackListTest(QueryCacheBase):
     fixtures = base.johnny_fixtures
 
     def test_basic_blacklist(self):
-        from johnny import cache, settings
         from testapp.models import Genre, Book
         q = base.message_queue()
         old = johnny_settings.BLACKLIST
@@ -86,8 +85,6 @@ class MultiDbTest(TransactionQueryCacheBase):
         def _inner(_query):
             from testapp.models import Genre, Book, Publisher, Person
             from johnny.signals import qc_hit, qc_miss, qc_skip
-            from johnny.cache import local
-            from django.db import transaction
             msg = []
             def hit(*args, **kwargs):
                 msg.append(True)
@@ -118,7 +115,6 @@ class MultiDbTest(TransactionQueryCacheBase):
             print("\n  Skipping multi database tests")
             return
 
-        from pprint import pformat
         from testapp.models import Genre, Book, Publisher, Person
         from django.db import connections
 
@@ -201,7 +197,6 @@ class MultiDbTest(TransactionQueryCacheBase):
                     return
 
         from django.db import connections, transaction
-        from johnny import cache as c
         from Queue import Queue as queue
         q = queue()
         other = lambda x: self._run_threaded(x, q)

@@ -4,7 +4,6 @@
 """Base test class for Johnny Cache Tests."""
 
 from __future__ import print_function
-import sys
 
 import django
 from django.test import TestCase, TransactionTestCase

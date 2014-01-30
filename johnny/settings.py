@@ -1,6 +1,5 @@
 from warnings import warn
 
-import django
 from django.conf import settings
 from django.core.cache import get_cache, cache
 

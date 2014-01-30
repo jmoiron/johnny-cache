@@ -1,6 +1,5 @@
 """Johnny's main caching functionality."""
 
-import re
 import time
 from uuid import uuid4
 
@@ -16,7 +15,6 @@ from johnny.decorators import wraps, available_attrs
 from transaction import TransactionManager
 
 import django
-from django.core.exceptions import ImproperlyConfigured
 from django.db.models.signals import post_save, post_delete
 from django.db.models.sql import compiler
 
