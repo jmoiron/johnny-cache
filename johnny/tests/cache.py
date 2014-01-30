@@ -3,6 +3,7 @@
 
 """Tests for the QueryCache functionality of johnny."""
 
+from __future__ import print_function
 import django
 from django.conf import settings
 from django.db import connection
@@ -114,7 +115,7 @@ class MultiDbTest(TransactionQueryCacheBase):
     def test_basic_queries(self):
         """Tests basic queries and that the cache is working for multiple db's"""
         if len(getattr(settings, "DATABASES", [])) <= 1:
-            print "\n  Skipping multi database tests"
+            print("\n  Skipping multi database tests")
             return
 
         from pprint import pformat
@@ -148,7 +149,7 @@ class MultiDbTest(TransactionQueryCacheBase):
     def test_cache_key_setting(self):
         """Tests that two databases use a single cached object when given the same DB cache key"""
         if len(getattr(settings, "DATABASES", [])) <= 1:
-            print "\n  Skipping multi database tests"
+            print("\n  Skipping multi database tests")
             return
 
         from testapp.models import Genre
@@ -180,23 +181,23 @@ class MultiDbTest(TransactionQueryCacheBase):
         """Tests transaction rollbacks and local cache for multiple dbs"""
 
         if len(getattr(settings, "DATABASES", [])) <= 1:
-            print "\n  Skipping multi database tests"
+            print("\n  Skipping multi database tests")
             return
         if hasattr(settings, 'DATABASE_ENGINE'):
             if settings.DATABASE_ENGINE == 'sqlite3':
-                print "\n  Skipping test requiring multiple threads."
+                print("\n  Skipping test requiring multiple threads.")
                 return
         else:
             from django.db import connections, transaction
             for db in settings.DATABASES.values():
                 if db['ENGINE'] == 'sqlite3':
-                    print "\n  Skipping test requiring multiple threads."
+                    print("\n  Skipping test requiring multiple threads.")
                     return
 
             for conname in connections:
                 con = connections[conname]
                 if not base.supports_transactions(con):
-                    print "\n  Skipping test requiring transactions."
+                    print("\n  Skipping test requiring transactions.")
                     return
 
         from django.db import connections, transaction
@@ -279,19 +280,19 @@ class MultiDbTest(TransactionQueryCacheBase):
             from django.db import connections, transaction
         except ImportError:
             # connections doesn't exist in 1.1 and under
-            print"\n  Skipping multi database tests"
+            print("\n  Skipping multi database tests")
 
         if len(getattr(settings, "DATABASES", [])) <= 1:
-            print "\n  Skipping multi database tests"
+            print("\n  Skipping multi database tests")
             return
         for name, db in settings.DATABASES.items():
             if name in ('default', 'second'):
                 if 'sqlite' in db['ENGINE']:
-                    print "\n  Skipping test requiring multiple threads."
+                    print("\n  Skipping test requiring multiple threads.")
                     return
                 con = connections[name]
                 if not con.features.uses_savepoints:
-                    print "\n  Skipping test requiring savepoints."
+                    print("\n  Skipping test requiring savepoints.")
                     return
 
         # sanity check 
@@ -731,11 +732,11 @@ class TransactionSupportTest(TransactionQueryCacheBase):
 
         if django.VERSION[:2] < (1, 3):
             if settings.DATABASE_ENGINE == 'sqlite3':
-                print "\n  Skipping test requiring multiple threads."
+                print("\n  Skipping test requiring multiple threads.")
                 return
         else:
             if settings.DATABASES.get('default', {}).get('ENGINE', '').endswith('sqlite3'):
-                print "\n  Skipping test requiring multiple threads."
+                print("\n  Skipping test requiring multiple threads.")
                 return
 
 
@@ -788,11 +789,11 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         from johnny import cache
         if django.VERSION[:2] < (1, 3):
             if settings.DATABASE_ENGINE == 'sqlite3':
-                print "\n  Skipping test requiring multiple threads."
+                print("\n  Skipping test requiring multiple threads.")
                 return
         else:
             if settings.DATABASES.get('default', {}).get('ENGINE', '').endswith('sqlite3'):
-                print "\n  Skipping test requiring multiple threads."
+                print("\n  Skipping test requiring multiple threads.")
                 return
 
         self.failUnless(transaction.is_managed() == False)

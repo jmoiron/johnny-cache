@@ -3,6 +3,7 @@
 
 """Base test class for Johnny Cache Tests."""
 
+from __future__ import print_function
 import sys
 
 import django
@@ -23,9 +24,9 @@ def show_johnny_signals(hit=None, miss=None):
     and miss keyword args."""
     from pprint import pformat
     def _hit(*args, **kwargs):
-        print "hit:\n\t%s\n\t%s\n" % (pformat(args), pformat(kwargs))
+        print("hit:\n\t%s\n\t%s\n" % (pformat(args), pformat(kwargs)))
     def _miss(*args, **kwargs):
-        print "miss:\n\t%s\n\t%s\n" % (pformat(args), pformat(kwargs))
+        print("miss:\n\t%s\n\t%s\n" % (pformat(args), pformat(kwargs)))
     hit = hit or _hit
     miss = miss or _miss
     def deco(func):
@@ -140,7 +141,7 @@ def supports_transactions(con):
     vendor = con.vendor
     if features.get("supports_transactions", False):
         if vendor == "mysql" and not features.get('_storage_engine', '') == "InnoDB":
-            print "MySQL connection reports transactions supported but storage engine != InnoDB."
+            print("MySQL connection reports transactions supported but storage engine != InnoDB.")
             return False
         return True
     return False
