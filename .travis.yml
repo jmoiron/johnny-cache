@@ -1,11 +1,14 @@
 language: python
 python:
-  - 2.4
-  - 2.5
+# WARNING: Travis CI does not support Python < 2.6
+#  - 2.4
+#  - 2.5
   - 2.6
   - 2.7
 #  - 3.2
 #  - 3.3
+services:
+  - memcached
 env:
 #  - DJANGO=1.1.4
 #  - DJANGO=1.2.7
