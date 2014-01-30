@@ -111,7 +111,7 @@ class TransactionManager(object):
                 self._commit_all_savepoints(using)
             c = self.local.mget('%s_%s_*' %
                                 (self.prefix, self._trunc_using(using)))
-            for key, value in c.iteritems():
+            for key, value in c.items():
                 self.cache_backend.set(key, value, self.timeout)
         else:
             if self._uses_savepoints():
@@ -153,7 +153,7 @@ class TransactionManager(object):
         #store them to a dictionary in the localstore
         if key not in self.local:
             self.local[key] = {}
-        for k, v in c.iteritems():
+        for k, v in c.items():
             self.local[key][k] = v
         #clear the dirty
         self._clear(using)
@@ -193,7 +193,7 @@ class TransactionManager(object):
                 stack.insert(0, popped)
             self._store_dirty(using)
             for i in stack:
-                for k, v in self.local.get(i, {}).iteritems():
+                for k, v in self.local.get(i, {}).items():
                     self.local[k] = v
                 del self.local[i]
             self._restore_dirty(using)
@@ -216,13 +216,13 @@ class TransactionManager(object):
                             (self.prefix, self._trunc_using(using)))
         backup = 'trans_dirty_store_%s' % self._trunc_using(using)
         self.local[backup] = {}
-        for k, v in c.iteritems():
+        for k, v in c.items():
             self.local[backup][k] = v
         self._clear(using)
 
     def _restore_dirty(self, using=None):
         backup = 'trans_dirty_store_%s' % self._trunc_using(using)
-        for k, v in self.local.get(backup, {}).iteritems():
+        for k, v in self.local.get(backup, {}).items():
             self.local[k] = v
         del self.local[backup]
 
