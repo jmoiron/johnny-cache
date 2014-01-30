@@ -229,7 +229,7 @@ class TransactionManager(object):
     def _savepoint(self, original):
         @wraps(original, assigned=available_attrs(original))
         def newfun(using=None):
-            if using != None:
+            if using is not None:
                 sid = original(using=using)
             else:
                 sid = original()

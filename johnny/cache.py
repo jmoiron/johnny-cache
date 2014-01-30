@@ -218,7 +218,7 @@ class KeyHandler(object):
         key = self.keygen.gen_table_key(table, db)
         val = self.cache_backend.get(key, None, db)
         #if local.get('in_test', None): print str(val).ljust(32), key
-        if val == None:
+        if val is None:
             val = self.keygen.random_generator()
             self.cache_backend.set(key, val, settings.MIDDLEWARE_SECONDS, db)
         return val
@@ -232,7 +232,7 @@ class KeyHandler(object):
         key = self.keygen.gen_multi_key(generations, db)
         val = self.cache_backend.get(key, None, db)
         #if local.get('in_test', None): print str(val).ljust(32), key
-        if val == None:
+        if val is None:
             val = self.keygen.random_generator()
             self.cache_backend.set(key, val, settings.MIDDLEWARE_SECONDS, db)
         return val
