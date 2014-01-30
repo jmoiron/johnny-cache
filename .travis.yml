@@ -12,13 +12,11 @@ services:
 env:
 #  - DJANGO=1.1.4
 #  - DJANGO=1.2.7
-#  - DJANGO=1.3.7
+  - DJANGO=1.3.7
   - DJANGO=1.4.10
 #  - DJANGO=1.5.5
 install:
-  - pip install Django==$DJANGO --use-mirrors
-  - pip install python-memcached --use-mirrors
-  - pip install coveralls --use-mirrors
+  - pip install Django==$DJANGO python-memcached coveralls --use-mirrors
 script:
   - coverage run --source=johnny manage.py test --traceback
 after_success:
