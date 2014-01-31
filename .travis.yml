@@ -17,7 +17,7 @@ install:
     then
       pip install python3-memcached --use-mirrors;
     else
-      pip install python-memcached;
+      pip install python-memcached --use-mirrors;
     fi
 script:
   - coverage run --source=johnny manage.py test --traceback
