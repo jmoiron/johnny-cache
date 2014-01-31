@@ -73,10 +73,12 @@ class BlackListTest(QueryCacheBase):
         connection.queries = []
         Book.objects.get(id=1)
         Book.objects.get(id=1)
-        self.assertEqual((q.get_nowait(), q.get_nowait()), (False, True))
+        self.assertFalse(q.get_nowait())
+        self.assertTrue(q.get_nowait())
         list(Genre.objects.all())
         list(Genre.objects.all())
-        self.assertFalse(any((q.get_nowait(), q.get_nowait())))
+        self.assertFalse(q.get_nowait())
+        self.assertFalse(q.get_nowait())
         johnny_settings.BLACKLIST = old
 
 
