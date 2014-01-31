@@ -45,9 +45,9 @@ class TestTransactionMiddleware(base.TransactionJohnnyWebTestCase):
         connection.queries = []
         q = base.message_queue()
         response = self.client.get('/test/template_queries')
-        self.failUnless(q.get() is False)
+        self.assertFalse(q.get())
         response = self.client.get('/test/template_queries')
-        self.failUnless(q.get() is False)
+        self.assertFalse(q.get())
 
 class TestJohnnyTransactionMiddleware(base.TransactionJohnnyWebTestCase):
     """This test verifies that a workaround middleware provided with johnny
@@ -72,7 +72,7 @@ class TestJohnnyTransactionMiddleware(base.TransactionJohnnyWebTestCase):
         connection.queries = []
         q = base.message_queue()
         response = self.client.get('/test/template_queries')
-        self.failUnless(q.get() is False)
+        self.assertFalse(q.get())
         response = self.client.get('/test/template_queries')
-        self.failUnless(q.get() is True)
+        self.assertTrue(q.get())
 
