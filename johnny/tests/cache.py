@@ -676,7 +676,7 @@ class MultiModelTest(QueryCacheBase):
         # now execute the same query;  the result should be diff and it should be
         # a cache miss
         new_count = written_books.count()
-        self.assertTrue(new_count != count)
+        self.assertNotEqual(new_count, count)
         self.assertFalse(q.get())
         PersonType.objects.filter(title='NonAuthor').order_by('-title')[:5]
 
@@ -760,7 +760,7 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         # local invalidation, this key should hit the localstore!
         nowlen = len(cache.local)
         start.save()
-        self.assertTrue(nowlen != len(cache.local))
+        self.assertNotEqual(nowlen, len(cache.local))
         # perform a read OUTSIDE this transaction... it should still see the
         # old gen key, and should still find the "old" data
         other('Genre.objects.get(id=1)')
@@ -816,7 +816,7 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         # local invalidation, this key should hit the localstore!
         nowlen = len(cache.local)
         start.save()
-        self.assertTrue(nowlen != len(cache.local))
+        self.assertNotEqual(nowlen, len(cache.local))
         # perform a read OUTSIDE this transaction... it should still see the
         # old gen key, and should still find the "old" data
         other('Genre.objects.get(id=1)')
