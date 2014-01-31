@@ -70,7 +70,6 @@ class BlackListTest(QueryCacheBase):
         q = base.message_queue()
         old = johnny_settings.BLACKLIST
         johnny_settings.BLACKLIST = set(['testapp_genre'])
-        connection.queries = []
         Book.objects.get(id=1)
         Book.objects.get(id=1)
         self.assertFalse(q.get_nowait())
@@ -122,7 +121,6 @@ class MultiDbTest(TransactionQueryCacheBase):
             return
 
         from .testapp.models import Genre
-        from django.db import connections
 
         self.assertTrue("default" in getattr(settings, "DATABASES"))
         self.assertTrue("second" in getattr(settings, "DATABASES"))
@@ -133,20 +131,18 @@ class MultiDbTest(TransactionQueryCacheBase):
         g2 = Genre.objects.using("second").get(pk=1)
         g2.title = "A second database"
         g2.save(using='second')
-        for c in connections:
-            connections[c].queries = []
         #fresh from cache since we saved each
-        g1 = Genre.objects.using('default').get(pk=1)
-        g2 = Genre.objects.using('second').get(pk=1)
-        for c in connections:
-            self.assertEqual(len(connections[c].queries), 1)
+        with self.assertNumQueries(1, using='default'):
+            with self.assertNumQueries(1, using='second'):
+                g1 = Genre.objects.using('default').get(pk=1)
+                g2 = Genre.objects.using('second').get(pk=1)
         self.assertEqual(g1.title, "A default database")
         self.assertEqual(g2.title, "A second database")
         #should be a cache hit
-        g1 = Genre.objects.using('default').get(pk=1)
-        g2 = Genre.objects.using('second').get(pk=1)
-        for c in connections:
-            self.assertEqual(len(connections[c].queries), 1)
+        with self.assertNumQueries(0, using='default'):
+            with self.assertNumQueries(0, using='second'):
+                g1 = Genre.objects.using('default').get(pk=1)
+                g2 = Genre.objects.using('second').get(pk=1)
 
     def test_cache_key_setting(self):
         """Tests that two databases use a single cached object when given the same DB cache key"""
@@ -155,7 +151,6 @@ class MultiDbTest(TransactionQueryCacheBase):
             return
 
         from .testapp.models import Genre
-        from django.db import connections
 
         self.assertTrue("default" in getattr(settings, "DATABASES"))
         self.assertTrue("second" in getattr(settings, "DATABASES"))
@@ -169,15 +164,12 @@ class MultiDbTest(TransactionQueryCacheBase):
         g2 = Genre.objects.using("second").get(pk=1)
         g2.title = "A second database"
         g2.save(using='second')
-        for c in connections:
-            connections[c].queries = []
         #fresh from cache since we saved each
-        g1 = Genre.objects.using('default').get(pk=1)
-        g2 = Genre.objects.using('second').get(pk=1)
+        with self.assertNumQueries(1, using='default'):
+            with self.assertNumQueries(0, using='second'):
+                g1 = Genre.objects.using('default').get(pk=1)
+                g2 = Genre.objects.using('second').get(pk=1)
         johnny_settings.DB_CACHE_KEYS = old_cache_keys
-        total_queries = sum([len(connections[c].queries)
-                             for c in connections])
-        self.assertEqual(total_queries, 1)
 
     def test_transactions(self):
         """Tests transaction rollbacks and local cache for multiple dbs"""
@@ -395,29 +387,26 @@ class SingleModelTest(QueryCacheBase):
     def test_exists_hit(self):
         """Tests that an exist failure caches properly"""
         from .testapp.models import Publisher
-        connection.queries = []
 
-        Publisher.objects.filter(title="Doesn't Exist").exists()
-        Publisher.objects.filter(title="Doesn't Exist").exists()
-
-        self.assertEqual(len(connection.queries), 1)
+        with self.assertNumQueries(1):
+            Publisher.objects.filter(title="Doesn't Exist").exists()
+            Publisher.objects.filter(title="Doesn't Exist").exists()
 
     def test_basic_querycaching(self):
         """A basic test that querycaching is functioning properly and is
         being invalidated properly on singular table reads & writes."""
         from .testapp.models import Publisher, Genre
         from django.db.models import Q
-        connection.queries = []
-        starting_count = Publisher.objects.count()
-        starting_count = Publisher.objects.count()
-        # make sure that doing this twice doesn't hit the db twice
-        self.assertEqual(len(connection.queries), 1)
+
+        with self.assertNumQueries(1):
+            starting_count = Publisher.objects.count()
+            starting_count = Publisher.objects.count()
         self.assertEqual(starting_count, 1)
+
         # this write should invalidate the key we have
         Publisher(title='Harper Collins', slug='harper-collins').save()
-        connection.queries = []
-        new_count = Publisher.objects.count()
-        self.assertEqual(len(connection.queries), 1)
+        with self.assertNumQueries(1):
+            new_count = Publisher.objects.count()
         self.assertEqual(new_count, 2)
         # this tests the codepath after 'except EmptyResultSet' where
         # result_type == MULTI
@@ -432,15 +421,14 @@ class SingleModelTest(QueryCacheBase):
         """Test that the return results from the query cache are what we
         expect;  single items are single items, etc."""
         from .testapp.models import Publisher
-        connection.queries = []
-        pub = Publisher.objects.get(id=1)
-        pub2 = Publisher.objects.get(id=1)
+        with self.assertNumQueries(1):
+            pub = Publisher.objects.get(id=1)
+            pub2 = Publisher.objects.get(id=1)
         self.assertEqual(pub, pub2)
-        self.assertEqual(len(connection.queries), 1)
-        pubs = list(Publisher.objects.all())
-        pubs2 = list(Publisher.objects.all())
+        with self.assertNumQueries(1):
+            pubs = list(Publisher.objects.all())
+            pubs2 = list(Publisher.objects.all())
         self.assertEqual(pubs, pubs2)
-        self.assertEqual(len(connection.queries), 2)
 
     def test_delete(self):
         """Test that a database delete clears a table cache."""
@@ -449,9 +437,8 @@ class SingleModelTest(QueryCacheBase):
         begin = Genre.objects.all().count()
         g1.delete()
         self.assertRaises(Genre.DoesNotExist, lambda: Genre.objects.get(pk=1))
-        connection.queries = []
-        self.assertEqual(Genre.objects.all().count(), begin - 1)
-        self.assertEqual(len(connection.queries), 1)
+        with self.assertNumQueries(1):
+            self.assertEqual(Genre.objects.all().count(), begin - 1)
         Genre(title='Science Fiction', slug='scifi').save()
         Genre(title='Fantasy', slug='rubbish').save()
         Genre(title='Science Fact', slug='scifact').save()
@@ -465,13 +452,12 @@ class SingleModelTest(QueryCacheBase):
 
     def test_update(self):
         from .testapp.models import Genre
-        connection.queries = []
-        g1 = Genre.objects.get(pk=1)
-        Genre.objects.all().update(title="foo")
-        g2 = Genre.objects.get(pk=1)
+        with self.assertNumQueries(3):
+            g1 = Genre.objects.get(pk=1)
+            Genre.objects.all().update(title="foo")
+            g2 = Genre.objects.get(pk=1)
         self.assertNotEqual(g1.title, g2.title)
         self.assertEqual(g2.title, "foo")
-        self.assertEqual(len(connection.queries), 3)
 
     def test_empty_count(self):
         """Test for an empty count aggregate query with an IN"""
@@ -497,31 +483,27 @@ class SingleModelTest(QueryCacheBase):
         """This test exists to model the laziness of our queries;  the
         QuerySet cache should not alter the laziness of QuerySets."""
         from .testapp.models import Genre
-        connection.queries = []
-        qs = Genre.objects.filter(title__startswith='A')
-        qs = qs.filter(pk__lte=1)
-        qs = qs.order_by('pk')
-        # we should only execute the query at this point
-        arch = qs[0]
-        self.assertEqual(len(connection.queries), 1)
+        with self.assertNumQueries(1):
+            qs = Genre.objects.filter(title__startswith='A')
+            qs = qs.filter(pk__lte=1)
+            qs = qs.order_by('pk')
+            # we should only execute the query at this point
+            arch = qs[0]
 
     def test_order_by(self):
         """A basic test that our query caching is taking order clauses
         into account."""
         from .testapp.models import Genre
-        connection.queries = []
-        first = list(Genre.objects.filter(title__startswith='A').order_by('slug'))
-        second = list(Genre.objects.filter(title__startswith='A').order_by('-slug'))
-        # test that we've indeed done two queries and that the orders
-        # of the results are reversed
+        with self.assertNumQueries(2):
+            first = list(Genre.objects.filter(title__startswith='A').order_by('slug'))
+            second = list(Genre.objects.filter(title__startswith='A').order_by('-slug'))
+        # test that the orders of the results are reversed
         self.assertEqual((first[0], first[1]), (second[1], second[0]))
-        self.assertEqual(len(connection.queries), 2)
 
     def test_signals(self):
         """Test that the signals we say we're sending are being sent."""
         from .testapp.models import Genre
         from johnny.signals import qc_hit, qc_miss, qc_skip
-        connection.queries = []
         misses = []
         hits = []
         def qc_hit_listener(sender, **kwargs):
@@ -553,31 +535,26 @@ class MultiModelTest(QueryCacheBase):
         expect when involving multiple tables.  In particular, a query that
         joins 2 tables should invalidate when either table is invalidated."""
         from .testapp.models import Genre, Book, Publisher
-        connection.queries = []
-        books = list(Book.objects.select_related('publisher'))
-        books = list(Book.objects.select_related('publisher'))
-        str(books[0].genre)
-        # this should all have done one query..
-        self.assertEqual(len(connection.queries), 1)
+        with self.assertNumQueries(1):
+            books = list(Book.objects.select_related('publisher'))
+            books = list(Book.objects.select_related('publisher'))
+            str(books[0].genre)
         books = list(Book.objects.select_related('publisher'))
         # invalidate the genre key, which shouldn't impact the query
         Genre(title='Science Fiction', slug='scifi').save()
-        after_save = len(connection.queries)
-        books = list(Book.objects.select_related('publisher'))
-        self.assertEqual(len(connection.queries), after_save)
+        with self.assertNumQueries(0):
+            books = list(Book.objects.select_related('publisher'))
         # now invalidate publisher, which _should_
         p = Publisher(title='McGraw Hill', slug='mcgraw-hill')
         p.save()
-        after_save = len(connection.queries)
-        books = list(Book.objects.select_related('publisher'))
-        self.assertEqual(len(connection.queries), after_save + 1)
+        with self.assertNumQueries(1):
+            books = list(Book.objects.select_related('publisher'))
         # the query should be cached again...
         books = list(Book.objects.select_related('publisher'))
         # this time, create a book and the query should again be uncached..
         Book(title='Anna Karenina', slug='anna-karenina', publisher=p).save()
-        after_save = len(connection.queries)
-        books = list(Book.objects.select_related('publisher'))
-        self.assertEqual(len(connection.queries), after_save + 1)
+        with self.assertNumQueries(1):
+            books = list(Book.objects.select_related('publisher'))
 
     def test_invalidate(self):
         """Test for the module-level invalidation function."""
@@ -607,36 +584,33 @@ class MultiModelTest(QueryCacheBase):
         p1 = Person.objects.get(pk=1)
         p2 = Person.objects.get(pk=2)
         b.authors.add(p1)
-        connection.queries = []
-
-        list(b.authors.all())
 
         #many to many should be invalidated
-        self.assertEqual(len(connection.queries), 1)
+        with self.assertNumQueries(1):
+            list(b.authors.all())
+
         b.authors.remove(p1)
         b = Book.objects.get(pk=1)
         list(b.authors.all())
         #can't determine the queries here, 1.1 and 1.2 uses them differently
 
-        connection.queries = []
         #many to many should be invalidated, 
         #person is not invalidated since we just want
         #the many to many table to be
-        p1 = Person.objects.get(pk=1)
-        self.assertEqual(len(connection.queries), 0)
+        with self.assertNumQueries(0):
+            p1 = Person.objects.get(pk=1)
 
         p1.books.add(b)
-        connection.queries = []
 
         #many to many should be invalidated,
         #this is the first query
-        list(p1.books.all())
-        b = Book.objects.get(pk=1)
-        self.assertEqual(len(connection.queries), 1)
+        with self.assertNumQueries(1):
+            list(p1.books.all())
+            b = Book.objects.get(pk=1)
 
         #query should be cached
-        self.assertEqual(len(list(p1.books.all())), 1)
-        self.assertEqual(len(connection.queries), 1)
+        with self.assertNumQueries(0):
+            self.assertEqual(len(list(p1.books.all())), 1)
 
         #testing clear
         b.authors.clear()
@@ -644,25 +618,21 @@ class MultiModelTest(QueryCacheBase):
         self.assertEqual(p1.books.all().count(), 0)
         b.authors.add(p1)
         self.assertEqual(b.authors.all().count(), 1)
-        queries = len(connection.queries)
 
-        #should be cached
-        b.authors.all().count()
-        self.assertEqual(len(connection.queries), queries)
+        with self.assertNumQueries(0):
+            b.authors.all().count()
         self.assertEqual(p1.books.all().count(), 1)
         p1.books.clear()
         self.assertEqual(b.authors.all().count(), 0)
 
     def test_subselect_support(self):
         """Test that subselects are handled properly."""
-        from django import db
-        db.reset_queries()
         from .testapp.models import Book, Person, PersonType
-        author_types = PersonType.objects.filter(title='Author')
-        author_people = Person.objects.filter(person_types__in=author_types)
-        written_books = Book.objects.filter(authors__in=author_people)
+        with self.assertNumQueries(0):
+            author_types = PersonType.objects.filter(title='Author')
+            author_people = Person.objects.filter(person_types__in=author_types)
+            written_books = Book.objects.filter(authors__in=author_people)
         q = base.message_queue()
-        self.assertEqual(len(db.connection.queries), 0)
         count = written_books.count()
         self.assertFalse(q.get())
         # execute the query again, this time it's cached
@@ -674,7 +644,6 @@ class MultiModelTest(QueryCacheBase):
         pt.save()
         self.assertEqual(PersonType.objects.filter(title='Author').count(), 0)
         q.clear()
-        db.reset_queries()
         # now execute the same query;  the result should be diff and it should be
         # a cache miss
         new_count = written_books.count()
@@ -744,7 +713,6 @@ class TransactionSupportTest(TransactionQueryCacheBase):
 
         self.assertFalse(transaction.is_managed())
         self.assertFalse(transaction.is_dirty())
-        connection.queries = []
         cache.local.clear()
         q = Queue()
         other = lambda x: self._run_threaded(x, q)
@@ -799,7 +767,6 @@ class TransactionSupportTest(TransactionQueryCacheBase):
 
         self.assertFalse(transaction.is_managed())
         self.assertFalse(transaction.is_dirty())
-        connection.queries = []
         cache.local.clear()
         q = Queue()
         other = lambda x: self._run_threaded(x, q)
@@ -854,7 +821,6 @@ class TransactionSupportTest(TransactionQueryCacheBase):
             return
         self.assertFalse(transaction.is_managed())
         self.assertFalse(transaction.is_dirty())
-        connection.queries = []
         cache.local.clear()
         transaction.enter_transaction_management()
         transaction.managed()
@@ -889,7 +855,6 @@ class TransactionSupportTest(TransactionQueryCacheBase):
             return
         self.assertFalse(transaction.is_managed())
         self.assertFalse(transaction.is_dirty())
-        connection.queries = []
         cache.local.clear()
         transaction.enter_transaction_management()
         transaction.managed()
@@ -902,21 +867,19 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         sid = transaction.savepoint()
         g.title = "In the Void"
         g.save()
-        connection.queries = []
         #should be a database hit because of save in savepoint
-        g = Genre.objects.get(pk=1)
-        self.assertEqual(len(connection.queries), 1)
+        with self.assertNumQueries(1):
+            g = Genre.objects.get(pk=1)
         self.assertEqual(g.title, "In the Void")
         transaction.savepoint_commit(sid)
         #should be a cache hit against the dirty store
-        connection.queries = []
-        g = Genre.objects.get(pk=1)
-        self.assertEqual(connection.queries, [])
+        with self.assertNumQueries(0):
+            g = Genre.objects.get(pk=1)
         self.assertEqual(g.title, "In the Void")
         transaction.commit()
         #should have been pushed up to cache store
-        g = Genre.objects.get(pk=1)
-        self.assertEqual(connection.queries, [])
+        with self.assertNumQueries(0):
+            g = Genre.objects.get(pk=1)
         self.assertEqual(g.title, "In the Void")
         transaction.managed(False)
         transaction.leave_transaction_management()
