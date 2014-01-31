@@ -85,7 +85,7 @@ class MultiDbTest(TransactionQueryCacheBase):
     multi_db = True
     fixtures = ['genres.json', 'genres.second.json']
 
-    def _run_threaded(self, query, queue):
+    def _run_threaded(self, query, queue, data):
         """Runs a query (as a string) from testapp in another thread and
         puts (hit?, result) on the provided queue."""
         def _inner(_query):
@@ -100,7 +100,7 @@ class MultiDbTest(TransactionQueryCacheBase):
             qc_hit.connect(hit)
             qc_miss.connect(miss)
             qc_skip.connect(skip)
-            obj = eval(_query)
+            obj = eval(_query, data)
             msg.append(obj)
             queue.put(msg)
         t = Thread(target=_inner, args=(query,))
@@ -195,10 +195,9 @@ class MultiDbTest(TransactionQueryCacheBase):
                     return
 
         from django.db import connections, transaction
-        q = Queue()
-        other = lambda x: self._run_threaded(x, q)
-
         from .testapp.models import Genre
+        q = Queue()
+        other = lambda x: self._run_threaded(x, q, {'Genre': Genre})
 
 
         # sanity check 
@@ -263,10 +262,10 @@ class MultiDbTest(TransactionQueryCacheBase):
 
     def test_savepoints(self):
         """tests savepoints for multiple db's"""
-        q = Queue()
-        other = lambda x: self._run_threaded(x, q)
-
         from .testapp.models import Genre
+        q = Queue()
+        other = lambda x: self._run_threaded(x, q, {'Genre': Genre})
+
         try:
             from django.db import connections, transaction
         except ImportError:
