@@ -18,6 +18,12 @@ env:
   - DJANGO=1.5.5
 install:
   - pip install Django==$DJANGO python-memcached coveralls --use-mirrors
+  - if [ $TRAVIS_PYTHON_VERSION == 3.2 ] || [ $TRAVIS_PYTHON_VERSION == 3.3 ]
+    then
+      pip install python3-memcached --use-mirrors
+    else
+      pip install python-memcached
+    fi
 script:
   - coverage run --source=johnny manage.py test --traceback
 after_success:
