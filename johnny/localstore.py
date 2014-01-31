@@ -85,7 +85,7 @@ class LocalStore(threading.local):
             return {}
         expr = re.compile(fnmatch.translate(pat))
         m = {}
-        for key in self.keys():
+        for key in tuple(self.keys()):
             #make sure the key is a str first
             if isinstance(key, string_types):
                 if expr.match(key):
@@ -101,7 +101,7 @@ class LocalStore(threading.local):
             return self.__dict__.clear()
 
         expr = re.compile(fnmatch.translate(pat))
-        for key in self.keys():
+        for key in tuple(self.keys()):
             #make sure the key is a str first
             if isinstance(key, string_types):
                 if expr.match(key):
