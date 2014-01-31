@@ -1,5 +1,6 @@
 # Django settings for proj project.
 
+import os
 import django
 
 DEBUG = True
@@ -17,14 +18,15 @@ if django.VERSION[:2] < (1, 3):
     DATABASE_HOST = ''              # Set to empty string for localhost. Not used with sqlite3.
     DATABASE_PORT = ''              # Set to empty string for default. Not used with sqlite3.
 else:
+    db_engine = os.environ.get('DB_ENGINE', 'sqlite3')
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': 'default.db',
+            'ENGINE': 'django.db.backends.' + db_engine,
+            'NAME': 'johnny_db',
         },
         'second': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': 'second.db',
+            'ENGINE': 'django.db.backends.' + db_engine,
+            'NAME': 'johnny2_db',
         },
     }
 
