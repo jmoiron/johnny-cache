@@ -4,7 +4,11 @@ import re
 import fnmatch
 import threading
 import warnings
-from django.utils.six import string_types
+
+try:
+    from django.utils.six import string_types
+except ImportError:  # For Django < 1.4.2
+    string_types = (str, unicode)
 
 
 class LocalStore(threading.local):
