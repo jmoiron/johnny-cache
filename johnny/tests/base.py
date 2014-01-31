@@ -4,6 +4,10 @@
 """Base test class for Johnny Cache Tests."""
 
 from __future__ import print_function
+try:
+    from queue import Queue
+except ImportError:  # Python < 3.0
+    from Queue import Queue
 
 import django
 from django.test import TestCase, TransactionTestCase
@@ -115,8 +119,7 @@ class message_queue(object):
     will get gc'd pretty fast."""
     def __init__(self):
         from johnny.signals import qc_hit, qc_miss, qc_skip
-        from Queue import Queue as queue
-        self.q = queue()
+        self.q = Queue()
         qc_hit.connect(self._hit)
         qc_miss.connect(self._miss)
         qc_skip.connect(self._skip)
