@@ -11,7 +11,7 @@ from django.conf import settings
 from django.utils.translation import ugettext_lazy as _
 
 def get_urlfield(*args, **kwargs):
-    if django.VERSION >= 1.4 and 'verify_exists' in kwargs:
+    if float(django.get_version()[:3]) >= 1.4 and 'verify_exists' in kwargs:
         del kwargs['verify_exists']
         return models.URLField(*args, **kwargs)
     return models.URLField(*args, **kwargs)
