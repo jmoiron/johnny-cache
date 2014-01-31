@@ -17,7 +17,7 @@ env:
   - DJANGO=1.4.10
   - DJANGO=1.5.5
 install:
-  - pip install Django==$DJANGO python-memcached coveralls --use-mirrors
+  - pip install Django==$DJANGO coveralls --use-mirrors
   - if [[ $TRAVIS_PYTHON_VERSION == 3.2 ]]
        || [[ $TRAVIS_PYTHON_VERSION == 3.3 ]];
     then
