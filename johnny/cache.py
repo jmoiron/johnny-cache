@@ -18,6 +18,15 @@ from django.db.models.signals import post_save, post_delete
 from django.db.models.sql import compiler
 
 try:
+    from django.utils.encoding import force_text
+    from django.utils.six import string_types, text_type
+except ImportError:  # Django < 1.4.2
+    force_text = unicode
+    string_types = (str, unicode)
+    text_type = unicode
+
+
+try:
     any
 except NameError:
 
@@ -79,7 +88,7 @@ patch,unpatch = enable,disable
 
 def resolve_table(x):
     """Return a table name for x, where x is either a model instance or a string."""
-    if isinstance(x, basestring):
+    if isinstance(x, string_types):
         return x
     return x._meta.db_table
 
@@ -158,8 +167,8 @@ class KeyGen(object):
         Returns a key that is standard for a given table name and database
         alias. Total length up to 212 (max for memcache is 250).
         """
-        table = unicode(table)
-        db = unicode(settings.DB_CACHE_KEYS[db])
+        table = force_text(table)
+        db = force_text(settings.DB_CACHE_KEYS[db])
         if len(table) > 100:
             table = table[0:68] + self.gen_key(table[68:])
         if db and len(db) > 100:
@@ -175,7 +184,7 @@ class KeyGen(object):
 
     @staticmethod
     def _convert(x):
-        if isinstance(x, unicode):
+        if isinstance(x, text_type):
             return x.encode('utf-8')
         return str(x)
 

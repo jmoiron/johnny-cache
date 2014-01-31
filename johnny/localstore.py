@@ -7,7 +7,7 @@ import warnings
 
 try:
     from django.utils.six import string_types
-except ImportError:  # For Django < 1.4.2
+except ImportError:  # Django < 1.4.2
     string_types = (str, unicode)
 
 
