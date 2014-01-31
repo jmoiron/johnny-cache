@@ -118,3 +118,5 @@ except ImportError:
 lcls = locals()
 if 'DATABASES' in lcls and len(lcls['DATABASES']) > 1:
     DATABASE_ROUTERS = ['routers.MultiSyncedRouter']
+
+TEST_RUNNER = 'django.test.simple.DjangoTestSuiteRunner'
