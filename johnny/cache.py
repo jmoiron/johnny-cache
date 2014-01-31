@@ -18,9 +18,10 @@ from django.db.models.signals import post_save, post_delete
 from django.db.models.sql import compiler
 
 try:
-    from django.utils.encoding import force_text
+    from django.utils.encoding import force_bytes, force_text
     from django.utils.six import string_types, text_type
 except ImportError:  # Django < 1.4.2
+    force_bytes = str
     force_text = unicode
     string_types = (str, unicode)
     text_type = unicode
@@ -160,7 +161,7 @@ class KeyGen(object):
 
     def random_generator(self):
         """Creates a random unique id."""
-        return self.gen_key(str(uuid4()))
+        return self.gen_key(force_bytes(uuid4()))
 
     def gen_table_key(self, table, db='default'):
         """
@@ -186,7 +187,7 @@ class KeyGen(object):
     def _convert(x):
         if isinstance(x, text_type):
             return x.encode('utf-8')
-        return str(x)
+        return force_bytes(x)
 
     @staticmethod
     def _recursive_convert(x, key):
@@ -223,7 +224,7 @@ class KeyHandler(object):
         """Creates a random generation value for a single table name"""
         key = self.keygen.gen_table_key(table, db)
         val = self.cache_backend.get(key, None, db)
-        #if local.get('in_test', None): print str(val).ljust(32), key
+        #if local.get('in_test', None): print force_bytes(val).ljust(32), key
         if val is None:
             val = self.keygen.random_generator()
             self.cache_backend.set(key, val, settings.MIDDLEWARE_SECONDS, db)
@@ -237,7 +238,7 @@ class KeyHandler(object):
             generations.append(self.get_single_generation(table, db))
         key = self.keygen.gen_multi_key(generations, db)
         val = self.cache_backend.get(key, None, db)
-        #if local.get('in_test', None): print str(val).ljust(32), key
+        #if local.get('in_test', None): print force_bytes(val).ljust(32), key
         if val is None:
             val = self.keygen.random_generator()
             self.cache_backend.set(key, val, settings.MIDDLEWARE_SECONDS, db)
