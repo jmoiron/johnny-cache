@@ -20,7 +20,6 @@ install:
       pip install python-memcached --use-mirrors;
     fi
 before_script:
-  - psql -c 'CREATE USER travis CREATEDB;' -U postgres
   - psql -c 'CREATE DATABASE johnny_db OWNER travis;' -U postgres
   - psql -c 'CREATE DATABASE johnny2_db OWNER travis;' -U postgres
 script:
