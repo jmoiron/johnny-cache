@@ -89,8 +89,8 @@ class LocalStoreTest(TestCase):
         cache.local.clear()
         cache.local['eggs'] = 'spam'
         cache.local['charlie'] = 'chaplin'
-        self.assertTrue(len(cache.local) == 2)
+        self.assertEqual(len(cache.local), 2)
         middleware.LocalStoreClearMiddleware().process_response(None, None)
-        self.assertTrue(len(cache.local) == 0)
+        self.assertEqual(len(cache.local), 0)
 
 
