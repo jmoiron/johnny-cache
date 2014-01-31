@@ -4,7 +4,7 @@ from django.db import connection
 try:
     from django.db import DEFAULT_DB_ALIAS
 except:
-    DEFUALT_DB_ALIAS = None
+    DEFAULT_DB_ALIAS = None
 
 from johnny.decorators import wraps, available_attrs
 
