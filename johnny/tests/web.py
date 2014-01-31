@@ -5,7 +5,7 @@
 
 from django.db import connection
 import django
-import base
+from . import base
 
 try:
     any

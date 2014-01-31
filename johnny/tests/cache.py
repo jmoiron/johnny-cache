@@ -13,7 +13,7 @@ except:
     connections = None
 from johnny import middleware
 from johnny import settings as johnny_settings
-import base
+from . import base
 
 try:
     any

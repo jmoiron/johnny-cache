@@ -8,11 +8,10 @@ try:
 except ImportError:
     from md5 import md5
 
-import localstore
-import signals
+from . import localstore, signals
 from johnny import settings
 from johnny.decorators import wraps, available_attrs
-from transaction import TransactionManager
+from .transaction import TransactionManager
 
 import django
 from django.db.models.signals import post_save, post_delete
