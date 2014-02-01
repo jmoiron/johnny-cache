@@ -58,7 +58,7 @@ MEDIA_URL = ''
 # Examples: "http://foo.com/media/", "/media/".
 ADMIN_MEDIA_PREFIX = '/media/'
 
-cache_backend = os.environ.get('CACHE_BACKEND', 'locmem')
+cache_backend = os.environ.get('CACHE_BACKEND', 'redis')
 if cache_backend == 'locmem':
     CACHES = {
         'default': {
@@ -79,9 +79,6 @@ elif cache_backend == 'redis':
             'BACKEND': 'johnny.backends.redis.RedisCache',
             'LOCATION': 'localhost:6379:0',
             'JOHNNY_CACHE': True,
-            'OPTIONS': {
-                'CLIENT_CLASS': 'redis_cache.client.DefaultClient',
-            },
         }
     }
 elif cache_backend == 'filebased':
