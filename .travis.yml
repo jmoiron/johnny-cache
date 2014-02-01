@@ -36,11 +36,11 @@ script:
     coverage run --source=johnny manage.py test --traceback
   - mv .coverage .coverage.2
 
-  - CACHE_BACKEND=memcached
+  - CACHE_BACKEND=locmem
     coverage run --source=johnny manage.py test --traceback
   - mv .coverage .coverage.3
 
-  - DB_ENGINE=postgresql_psycopg2 CACHE_BACKEND=memcached
+  - DB_ENGINE=postgresql_psycopg2 CACHE_BACKEND=locmem
     coverage run --source=johnny manage.py test --traceback
   - mv .coverage .coverage.4
 
