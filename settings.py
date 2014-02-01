@@ -73,6 +73,14 @@ elif cache_backend == 'memcached':
             'JOHNNY_CACHE': True,
         }
     }
+elif cache_backend == 'redis':
+    CACHES = {
+        'default': {
+            'BACKEND': 'johnny.backends.redis.RedisCache',
+            'LOCATION': 'localhost:6379',
+            'JOHNNY_CACHE': True,
+        }
+    }
 elif cache_backend == 'filebased':
     CACHES = {
         'default': {
