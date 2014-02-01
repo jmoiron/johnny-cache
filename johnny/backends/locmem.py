@@ -18,12 +18,12 @@ class LocMemCache(locmem.CacheClass):
 
     def add(self, key, value, timeout=None, **kwargs):
         if timeout is 0:
-            timeout = sys.maxint
+            timeout = sys.maxsize
         return super(LocMemCache, self).add(
             smart_str(key), value, timeout=timeout, **kwargs)
 
     def set(self, key, value, timeout=None, **kwargs):
         if timeout is 0:
-            timeout = sys.maxint
+            timeout = sys.maxsize
         return super(LocMemCache, self).set(
             smart_str(key), value, timeout=timeout, **kwargs)

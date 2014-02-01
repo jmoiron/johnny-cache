@@ -15,12 +15,12 @@ from django.core.cache.backends import filebased
 class FileBasedCache(filebased.CacheClass):
     def add(self, key, value, timeout=None, **kwargs):
         if timeout is 0:
-            timeout = sys.maxint
+            timeout = sys.maxsize
         return super(FileBasedCache, self).add(
             key, value, timeout=timeout, **kwargs)
 
     def set(self, key, value, timeout=None, **kwargs):
         if timeout is 0:
-            timeout = sys.maxint
+            timeout = sys.maxsize
         return super(FileBasedCache, self).set(
             key, value, timeout=timeout, **kwargs)
