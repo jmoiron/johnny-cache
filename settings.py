@@ -53,19 +53,19 @@ MEDIA_URL = ''
 # Examples: "http://foo.com/media/", "/media/".
 ADMIN_MEDIA_PREFIX = '/media/'
 
-cache_backend = os.environ.get('CACHE_BACKEND', 'memcached')
-if cache_backend == 'memcached':
+cache_backend = os.environ.get('CACHE_BACKEND', 'locmem')
+if cache_backend == 'locmem':
+    CACHES = {
+        'default': {
+            'BACKEND': 'johnny.backends.locmem.LocMemCache',
+        }
+    }
+elif cache_backend == 'memcached':
     CACHES = {
         'default': {
             'BACKEND': 'johnny.backends.memcached.MemcachedCache',
             'LOCATION': ['localhost:11211'],
             'JOHNNY_CACHE': True,
-        }
-    }
-elif cache_backend == 'locmem':
-    CACHES = {
-        'default': {
-            'BACKEND': 'johnny.backends.locmem.LocMemCache',
         }
     }
 else:

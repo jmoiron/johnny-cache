@@ -12,7 +12,7 @@ from django.core.cache.backends import filebased
 # names
 
 
-class FileBasedCache(filebased.CacheClass):
+class FileBasedCache(filebased.FileBasedCache):
     def add(self, key, value, timeout=None, **kwargs):
         if timeout is 0:
             timeout = sys.maxsize
