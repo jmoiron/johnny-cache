@@ -58,7 +58,7 @@ MEDIA_URL = ''
 # Examples: "http://foo.com/media/", "/media/".
 ADMIN_MEDIA_PREFIX = '/media/'
 
-cache_backend = os.environ.get('CACHE_BACKEND', 'redis')
+cache_backend = os.environ.get('CACHE_BACKEND', 'locmem')
 if cache_backend == 'locmem':
     CACHES = {
         'default': {
