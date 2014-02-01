@@ -10,24 +10,11 @@ try:
 except ImportError:  # Python < 3.0
     from Queue import Queue
 
-import django
 from django.conf import settings
-from django.db import connection
-try:
-    from django.db import connections
-except:
-    connections = None
+from django.db import connection, connections
 from johnny import middleware
 from johnny import settings as johnny_settings
 from . import base
-
-try:
-    any
-except NameError:
-    def any(iterable):
-        for i in iterable:
-            if i: return True
-        return False
 
 # put tests in here to be included in the testing suite
 __all__ = ['MultiDbTest', 'SingleModelTest', 'MultiModelTest', 'TransactionSupportTest', 'BlackListTest', 'TransactionManagerTestCase']
@@ -104,13 +91,6 @@ class MultiDbTest(TransactionQueryCacheBase):
             msg.append(obj)
             queue.put(msg)
         t = Thread(target=_inner, args=(query,))
-        t.start()
-        t.join()
-
-    def _other(self, cmd, q):
-        def _inner(cmd):
-            q.put(eval(cmd))
-        t = Thread(target=_inner, args=(cmd,))
         t.start()
         t.join()
 
@@ -700,15 +680,9 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         from .testapp.models import Genre
         from johnny import cache
 
-        if django.VERSION[:2] < (1, 3):
-            if settings.DATABASE_ENGINE == 'sqlite3':
-                print("\n  Skipping test requiring multiple threads.")
-                return
-        else:
-            if settings.DATABASES.get('default', {}).get('ENGINE', '').endswith('sqlite3'):
-                print("\n  Skipping test requiring multiple threads.")
-                return
-
+        if settings.DATABASES.get('default', {}).get('ENGINE', '').endswith('sqlite3'):
+            print("\n  Skipping test requiring multiple threads.")
+            return
 
         self.assertFalse(transaction.is_managed())
         self.assertFalse(transaction.is_dirty())
@@ -755,14 +729,10 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         from django.db import transaction
         from .testapp.models import Genre
         from johnny import cache
-        if django.VERSION[:2] < (1, 3):
-            if settings.DATABASE_ENGINE == 'sqlite3':
-                print("\n  Skipping test requiring multiple threads.")
-                return
-        else:
-            if settings.DATABASES.get('default', {}).get('ENGINE', '').endswith('sqlite3'):
-                print("\n  Skipping test requiring multiple threads.")
-                return
+
+        if settings.DATABASES.get('default', {}).get('ENGINE', '').endswith('sqlite3'):
+            print("\n  Skipping test requiring multiple threads.")
+            return
 
         self.assertFalse(transaction.is_managed())
         self.assertFalse(transaction.is_dirty())

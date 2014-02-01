@@ -7,13 +7,6 @@ from django.db import connection
 import django
 from . import base
 
-try:
-    any
-except NameError:
-    def any(iterable):
-        for i in iterable:
-            if i: return True
-        return False
 
 # put tests in here to be included in the testing suite
 __all__ = ['TestTransactionMiddleware', 'TestJohnnyTransactionMiddleware']

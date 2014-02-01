@@ -1,17 +1,7 @@
 """Johnny's main caching functionality."""
 
-import time
+from hashlib import md5
 from uuid import uuid4
-
-try:
-    from hashlib import md5
-except ImportError:
-    from md5 import md5
-
-from . import localstore, signals
-from johnny import settings
-from johnny.decorators import wraps, available_attrs
-from .transaction import TransactionManager
 
 import django
 from django.db.models.signals import post_save, post_delete
@@ -27,15 +17,11 @@ except ImportError:  # Django < 1.4.2
     text_type = unicode
 
 
-try:
-    any
-except NameError:
+from . import localstore, signals
+from . import settings
+from .decorators import wraps, available_attrs
+from .transaction import TransactionManager
 
-    def any(iterable):
-        for i in iterable:
-            if i:
-                return True
-        return False
 
 class NotInCache(object):
     #This is used rather than None to properly cache empty querysets
@@ -133,20 +119,6 @@ def get_tables_for_query(query):
             tables += get_tables(node, tables)
 
     return list(set(tables))
-
-
-def timer(func):
-    times = []
-
-    @wraps(func, assigned=available_attrs(func))
-    def foo(*args, **kwargs):
-        t0 = time.time()
-        ret = func(*args, **kwargs)
-        times.append(time.time() - t0)
-        print ("%d runs, %0.6f avg" %
-               (len(times), sum(times) / float(len(times))))
-        return ret
-    return foo
 
 
 # The KeyGen is used only to generate keys.  Some of these keys will be used
@@ -439,12 +411,6 @@ class QueryCacheBackend(object):
         self.cache_backend.unpatch()
         self._patched = False
 
-    def invalidate_m2m(self, instance, **kwargs):
-        if self._patched:
-            table = resolve_table(instance)
-            if not disallowed_table(table):
-                self.keyhandler.invalidate_table(instance)
-
     def invalidate(self, instance, **kwargs):
         if self._patched:
             table = resolve_table(instance)
@@ -469,8 +435,6 @@ class QueryCacheBackend(object):
     def _handle_signals(self):
         post_save.connect(self.invalidate, sender=None)
         post_delete.connect(self.invalidate, sender=None)
-        # FIXME: only needed in 1.1?
-        signals.qc_m2m_change.connect(self.invalidate_m2m, sender=None)
 
     def flush_query_cache(self):
         from django.db import connection

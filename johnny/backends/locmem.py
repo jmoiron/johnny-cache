@@ -14,25 +14,16 @@ from django.core.cache.backends import locmem
 from django.utils.encoding import smart_str
 
 
-class CacheClass(locmem.CacheClass):
+class LocMemCache(locmem.CacheClass):
 
     def add(self, key, value, timeout=None, **kwargs):
         if timeout is 0:
             timeout = sys.maxint
-        return super(CacheClass, self).add(
+        return super(LocMemCache, self).add(
             smart_str(key), value, timeout=timeout, **kwargs)
 
     def set(self, key, value, timeout=None, **kwargs):
         if timeout is 0:
             timeout = sys.maxint
-        return super(CacheClass, self).set(
+        return super(LocMemCache, self).set(
             smart_str(key), value, timeout=timeout, **kwargs)
-
-if django.VERSION[:2] > (1, 2):
-
-    class LocMemCache(CacheClass):
-        """
-        Locmem cache interpreting 0 as "a very long time", named according
-        to the Django 1.3 conventions.
-        """
-        pass

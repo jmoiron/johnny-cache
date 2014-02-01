@@ -45,11 +45,7 @@ class LocalStoreTest(TestCase):
             from queue import Queue
         except ImportError:  # Python < 3.0
             from Queue import Queue
-        from threading import Thread
-        try:
-            from threading import current_thread
-        except ImportError:  # Python < 2.6
-            from threading import currentThread as current_thread
+        from threading import Thread, current_thread
         from time import sleep
         store = localstore.LocalStore()
         store['name'] = "Hi"
@@ -57,11 +53,7 @@ class LocalStoreTest(TestCase):
         def do_test():
             sleep(0.1)
             t = current_thread()
-            try:
-                name = t.name
-            except AttributeError:
-                #python 2.5 difference
-                name = t.getName()
+            name = t.name
             store[name] = 1
             store['name'] = name
             q.put(dict(store))

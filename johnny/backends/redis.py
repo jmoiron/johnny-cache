@@ -6,24 +6,13 @@ cache invalidation other than timeouts.
 
 This module depends on the ``django-redis-cache`` app from PyPI.
 """
-import django
+
 from redis_cache import cache as redis
 
 
-class CacheClass(redis.CacheClass):
-
+class RedisCache(redis.RedisCache):
     def set(self, key, value, timeout=None, *args, **kwargs):
         if timeout == 0:
             timeout = 2591999
-        return super(CacheClass, self).set(key, value, timeout,
+        return super(RedisCache, self).set(key, value, timeout,
                                            *args, **kwargs)
-
-if django.VERSION[:2] > (1, 2):
-
-    class RedisCache(redis.RedisCache):
-
-        def set(self, key, value, timeout=None, *args, **kwargs):
-            if timeout == 0:
-                timeout = 2591999
-            return super(RedisCache, self).set(key, value, timeout,
-                                               *args, **kwargs)

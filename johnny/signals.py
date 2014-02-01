@@ -8,4 +8,3 @@ qc_hit = Signal(providing_args=['key', 'tables', 'query', 'size'])
 qc_miss = Signal(providing_args=['key', 'tables', 'query'])
 # sent when johnny skips a statement because of blacklisting
 qc_skip = Signal(providing_args=['key', 'tables', 'query'])
-qc_m2m_change = Signal(providing_args=['instance'])
