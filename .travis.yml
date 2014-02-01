@@ -37,11 +37,11 @@ script:
     coverage run --source=johnny manage.py test --traceback
   - mv .coverage .coverage.2
 
-  - CACHE_BACKEND=filebased
+  - CACHE_BACKEND=redis
     coverage run --source=johnny manage.py test --traceback
   - mv .coverage .coverage.3
 
-  - CACHE_BACKEND=redis
+  - CACHE_BACKEND=filebased
     coverage run --source=johnny manage.py test --traceback
   - mv .coverage .coverage.4
 
@@ -53,11 +53,11 @@ script:
     coverage run --source=johnny manage.py test --traceback
   - mv .coverage .coverage.6
 
-  - DB_ENGINE=postgresql_psycopg2 CACHE_BACKEND=filebased
+  - DB_ENGINE=postgresql_psycopg2 CACHE_BACKEND=redis
     coverage run --source=johnny manage.py test --traceback
   - mv .coverage .coverage.7
 
-  - DB_ENGINE=postgresql_psycopg2 CACHE_BACKEND=redis
+  - DB_ENGINE=postgresql_psycopg2 CACHE_BACKEND=filebased
     coverage run --source=johnny manage.py test --traceback
   - mv .coverage .coverage.8
 

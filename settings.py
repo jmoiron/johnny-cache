@@ -77,7 +77,7 @@ elif cache_backend == 'redis':
     CACHES = {
         'default': {
             'BACKEND': 'johnny.backends.redis.RedisCache',
-            'LOCATION': 'localhost:6379',
+            'LOCATION': 'localhost:6379:0',
             'JOHNNY_CACHE': True,
         }
     }
