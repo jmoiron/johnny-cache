@@ -79,6 +79,9 @@ elif cache_backend == 'redis':
             'BACKEND': 'johnny.backends.redis.RedisCache',
             'LOCATION': 'localhost:6379:0',
             'JOHNNY_CACHE': True,
+            'OPTIONS': {
+                'CLIENT_CLASS': 'redis_cache.client.DefaultClient',
+            },
         }
     }
 elif cache_backend == 'filebased':
