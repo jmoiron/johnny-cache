@@ -23,6 +23,9 @@ DATABASES = {
         'TEST_NAME': 'test_johnny2_db',
     },
 }
+if db_engine == 'postgresql_psycopg2':
+    DATABASES['default']['OPTIONS'] = {'autocommit': True}
+    DATABASES['second']['OPTIONS'] = {'autocommit': True}
 
 # Local time zone for this installation. Choices can be found here:
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
