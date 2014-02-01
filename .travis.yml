@@ -75,10 +75,10 @@ after_success:
 matrix:
   exclude:
     - python: 3.2
-      env: DJANGO=1.3.7  PSYCOPG2=2.4.1
+      env: DJANGO=1.3.7  PSYCOPG2=2.4.1 DJANGO_REDIS=a0806e34d1643887840cf3688933327b649c7a5a
     - python: 3.3
-      env: DJANGO=1.3.7  PSYCOPG2=2.4.1
+      env: DJANGO=1.3.7  PSYCOPG2=2.4.1 DJANGO_REDIS=a0806e34d1643887840cf3688933327b649c7a5a
     - python: 3.2
-      env: DJANGO=1.4.10 PSYCOPG2=2.5.2
+      env: DJANGO=1.4.10 PSYCOPG2=2.5.2 DJANGO_REDIS=3.4
     - python: 3.3
-      env: DJANGO=1.4.10 PSYCOPG2=2.5.2
+      env: DJANGO=1.4.10 PSYCOPG2=2.5.2 DJANGO_REDIS=3.4
