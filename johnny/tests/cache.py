@@ -219,14 +219,12 @@ class MultiDbTest(TransactionQueryCacheBase):
         self.assertEqual(ostart.title, start_g1)
         self.assertTrue(hit)
 
-        connections['default'].queries = []
-        connections['second'].queries = []
         #should be a cache hit due to rollback
-        g1 = Genre.objects.using("default").get(pk=1)
+        with self.assertNumQueries(0, using='default'):
+            g1 = Genre.objects.using("default").get(pk=1)
         #should be a db hit due to commit
-        g2 = Genre.objects.using("second").get(pk=1)
-        self.assertEqual(connections['default'].queries, [])
-        self.assertEqual(len(connections['second'].queries), 1)
+        with self.assertNumQueries(1, using='second'):
+            g2 = Genre.objects.using("second").get(pk=1)
 
         #other thread sould now be accessing the cache after the get
         #from the commit.
@@ -246,11 +244,7 @@ class MultiDbTest(TransactionQueryCacheBase):
         q = Queue()
         other = lambda x: self._run_threaded(x, q, {'Genre': Genre})
 
-        try:
-            from django.db import connections, transaction
-        except ImportError:
-            # connections doesn't exist in 1.1 and under
-            print("\n  Skipping multi database tests")
+        from django.db import connections, transaction
 
         if len(getattr(settings, "DATABASES", [])) <= 1:
             print("\n  Skipping multi database tests")
@@ -298,7 +292,6 @@ class MultiDbTest(TransactionQueryCacheBase):
         self.assertTrue(hit)
         self.assertEqual(ostart.title, start_g1)
         #should not be a hit due to rollback
-        connections["default"].queries = []
         transaction.savepoint_rollback(sid, using="default")
         g1 = Genre.objects.using("default").get(pk=1)
 
@@ -317,15 +310,14 @@ class MultiDbTest(TransactionQueryCacheBase):
         self.assertTrue(hit)
         self.assertEqual(ostart.title, start_g1)
 
-        connections["second"].queries = []
-        g2 = Genre.objects.using("second").get(pk=1)
-        self.assertEqual(connections["second"].queries, [])
+        with self.assertNumQueries(0, using='second'):
+            g2 = Genre.objects.using("second").get(pk=1)
 
         transaction.commit(using="second")
         transaction.managed(False, "second")
 
-        g2 = Genre.objects.using("second").get(pk=1)
-        self.assertEqual(connections["second"].queries, [])
+        with self.assertNumQueries(0, using='second'):
+            g2 = Genre.objects.using("second").get(pk=1)
         self.assertEqual(g2.title, "Committed savepoint")
 
         #now committed and cached, other thread should reflect new title
