@@ -68,6 +68,13 @@ elif cache_backend == 'memcached':
             'JOHNNY_CACHE': True,
         }
     }
+elif cache_backend == 'filebased':
+    CACHES = {
+        'default': {
+            'BACKEND': 'johnny.backends.filebased.FileBasedCache',
+            'LOCATION': '_cache',
+        }
+    }
 else:
     raise ValueError('The CACHE_BACKEND environment variable is invalid.')
 
