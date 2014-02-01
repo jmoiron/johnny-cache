@@ -8,6 +8,7 @@ python:
 
 services:
   - memcached
+  - redis-server
 
 env:
   - DJANGO=1.3.7  PSYCOPG2=2.4.1
