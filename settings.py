@@ -53,15 +53,23 @@ MEDIA_URL = ''
 # Examples: "http://foo.com/media/", "/media/".
 ADMIN_MEDIA_PREFIX = '/media/'
 
-#CACHES = { 'default' : { 'BACKEND': 'johnny.backends.locmem.LocMemCache' }}
-CACHES = {
-    'default' : {
-        'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
-        #'BACKEND': 'johnny.backends.memcached.MemcachedCache',
-        'LOCATION': ['localhost:11211'],
-        'JOHNNY_CACHE': True,
+cache_backend = os.environ.get('CACHE_BACKEND', 'locmem')
+if cache_backend == 'locmem':
+    CACHES = {
+        'default': {
+            'BACKEND': 'johnny.backends.locmem.LocMemCache',
+        }
     }
-}
+elif cache_backend == 'memcached':
+    CACHES = {
+        'default': {
+            'BACKEND': 'johnny.backends.memcached.MemcachedCache',
+            'LOCATION': ['localhost:11211'],
+            'JOHNNY_CACHE': True,
+        }
+    }
+else:
+    raise ValueError('The CACHE_BACKEND environment variable is invalid.')
 
 
 # Make this unique, and don't share it with anybody.
