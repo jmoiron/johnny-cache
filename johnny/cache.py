@@ -253,6 +253,15 @@ class KeyHandler(object):
         pieces of the query and the generation key.
         """
         # these keys will always look pretty opaque
+
+        # parameters have to be interleaved using simple separator
+        # for details, see ParamsClashBug test case
+        def expand_params(params):
+            for p in params:
+                yield p
+                yield "S"
+
+        params = list(expand_params(params))
         suffix = self.keygen.gen_key(sql, params, order, result_type)
         using = settings.DB_CACHE_KEYS[using]
         return '%s_%s_query_%s.%s' % (self.prefix, using, generation, suffix)

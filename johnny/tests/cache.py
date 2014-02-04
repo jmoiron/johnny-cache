@@ -23,7 +23,7 @@ except NameError:
         return False
 
 # put tests in here to be included in the testing suite
-__all__ = ['MultiDbTest', 'SingleModelTest', 'MultiModelTest', 'TransactionSupportTest', 'BlackListTest', 'TransactionManagerTestCase']
+__all__ = ['MultiDbTest', 'SingleModelTest', 'MultiModelTest', 'TransactionSupportTest', 'BlackListTest', 'TransactionManagerTestCase', 'ParamsClashBug']
 
 def _pre_setup(self):
     self.saved_DISABLE_SETTING = getattr(johnny_settings, 'DISABLE_QUERYSET_CACHE', False)
@@ -961,3 +961,30 @@ class TransactionManagerTestCase(base.TransactionJohnnyTestCase):
         tm._commit_all_savepoints()
         # And this checks if it actually happened.
         self.failUnless(table_key in tm.local)
+
+class ParamsClashBug(QueryCacheBase):
+    fixtures = base.johnny_fixtures
+    def test_params(self):
+
+        from testapp.models import PersonType, Person
+        for i in range(2, 22):
+            pt, _ = PersonType.objects.get_or_create(title='title %s' % i, slug='slug_%s' % i)
+            p = Person()
+            p.first_name = 'first name'
+            p.last_name = 'last name'
+            p.slug = 'person_%s' % i
+            p.gender = 1
+            p.save()
+            p.person_types.add(pt)
+
+        person_A = Person.objects.get(id = 1)
+        person_B = Person.objects.get(id = 12)
+        person_A.person_types.add(PersonType.objects.get(id = 21))
+        person_B.person_types.add(PersonType.objects.get(id = 1))
+
+        qset = person_A.person_types.through._default_manager.values_list('persontype', flat=True)
+        qset_A = qset.filter(person = 1, persontype__in = [21])
+        qset_B = qset.filter(person = 12, persontype__in = [1])
+
+        self.assertTrue(list(qset_A) == [21])
+        self.assertTrue(list(qset_B) == [1])
