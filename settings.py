@@ -1,6 +1,7 @@
 # Django settings for proj project.
 
 import os
+import warnings
 import django
 
 DEBUG = True
@@ -58,14 +59,8 @@ MEDIA_URL = ''
 # Examples: "http://foo.com/media/", "/media/".
 ADMIN_MEDIA_PREFIX = '/media/'
 
-cache_backend = os.environ.get('CACHE_BACKEND', 'locmem')
-if cache_backend == 'locmem':
-    CACHES = {
-        'default': {
-            'BACKEND': 'johnny.backends.locmem.LocMemCache',
-        }
-    }
-elif cache_backend == 'memcached':
+cache_backend = os.environ.get('CACHE_BACKEND', 'memcached')
+if cache_backend == 'memcached':
     CACHES = {
         'default': {
             'BACKEND': 'johnny.backends.memcached.MemcachedCache',
@@ -81,6 +76,13 @@ elif cache_backend == 'redis':
             'JOHNNY_CACHE': True,
         }
     }
+elif cache_backend == 'locmem':
+    CACHES = {
+        'default': {
+            'BACKEND': 'johnny.backends.locmem.LocMemCache',
+        }
+    }
+    warnings.warn('Some tests may fail with the locmem cache backend!')
 elif cache_backend == 'filebased':
     CACHES = {
         'default': {
@@ -88,6 +90,7 @@ elif cache_backend == 'filebased':
             'LOCATION': '_cache',
         }
     }
+    warnings.warn('Some tests may fail with the file-based cache backend!')
 else:
     raise ValueError('The CACHE_BACKEND environment variable is invalid.')
 

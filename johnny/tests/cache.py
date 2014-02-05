@@ -29,10 +29,7 @@ def is_multithreading_safe(db_using=None):
         return all(is_multithreading_safe(db_using=db_name)
                    for db_name in settings.DATABASES)
     db_engine = settings.DATABASES.get(db_using, {}).get('ENGINE', 'sqlite3')
-    cache_engine = settings.CACHES.get('default', {}).get('BACKEND',
-                                                          'FileBasedCache')
-    return not db_engine.endswith('sqlite3') \
-        and not cache_engine.endswith('FileBasedCache')
+    return not db_engine.endswith('sqlite3')
 
 
 def _pre_setup(self):
