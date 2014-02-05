@@ -54,10 +54,12 @@ class CommittingTransactionMiddleware(trans_middleware.TransactionMiddleware):
     transactions, even if they aren't dirty.
     """
     def process_response(self, request, response):
+        autocommit = transaction.get_autocommit()
         if transaction.is_managed():
             try:
                 transaction.commit()
             except:
                 pass
             transaction.leave_transaction_management()
+        transaction.set_autocommit(autocommit)
         return response

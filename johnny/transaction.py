@@ -1,6 +1,7 @@
 import django
 from django.db import transaction, connection, DEFAULT_DB_ALIAS
 
+from johnny import settings as johnny_settings
 from johnny.decorators import wraps, available_attrs
 
 
@@ -72,6 +73,7 @@ class TransactionManager(object):
     def _trunc_using(self, using):
         if using is None:
             using = DEFAULT_DB_ALIAS
+        using = johnny_settings.DB_CACHE_KEYS[using]
         if len(using) > 100:
             using = using[0:68] + self.keygen.gen_key(using[68:])
         return using
@@ -152,7 +154,8 @@ class TransactionManager(object):
         self._clear(using)
         #append the key to the savepoint stack
         sids = self._get_sid(using)
-        sids.append(key)
+        if key not in sids:
+            sids.append(key)
 
     def _rollback_savepoint(self, sid, using=None):
         sids = self._get_sid(using)
