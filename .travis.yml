@@ -21,44 +21,40 @@ install:
   - if [[ $TRAVIS_PYTHON_VERSION == 3.2 ]]
        || [[ $TRAVIS_PYTHON_VERSION == 3.3 ]];
     then
-      pip install python3-memcached --use-mirrors;
+      pip install
+        python3-memcached
+        -e git+https://github.com/clelland/MySQL-for-Python-3#egg=MySQL-python
+        --use-mirrors;
     else
-      pip install python-memcached --use-mirrors;
+      pip install python-memcached MySQL-python --use-mirrors;
     fi
 
 before_script:
-  - psql -c 'CREATE DATABASE johnny_db;'
-  - psql -c 'CREATE DATABASE johnny2_db;'
+  - psql -c 'CREATE DATABASE johnny_db;' -U postgres
+  - psql -c 'CREATE DATABASE johnny2_db;' -U postgres
   - mysql -e 'CREATE DATABASE johnny_db;'
   - mysql -e 'CREATE DATABASE johnny2_db;'
 
 script:
   - CACHE_BACKEND=memcached
     coverage run --source=johnny manage.py test --traceback
-  - mv .coverage .coverage.1
 
   - CACHE_BACKEND=redis
-    coverage run --source=johnny manage.py test --traceback
-  - mv .coverage .coverage.2
+    coverage -a run --source=johnny manage.py test --traceback
 
   - DB_ENGINE=postgresql_psycopg2 CACHE_BACKEND=memcached
-    coverage run --source=johnny manage.py test --traceback
-  - mv .coverage .coverage.3
+    coverage -a run --source=johnny manage.py test --traceback
 
   - DB_ENGINE=postgresql_psycopg2 CACHE_BACKEND=redis
-    coverage run --source=johnny manage.py test --traceback
-  - mv .coverage .coverage.4
+    coverage -a run --source=johnny manage.py test --traceback
 
   - DB_ENGINE=mysql CACHE_BACKEND=memcached
-    coverage run --source=johnny manage.py test --traceback
-  - mv .coverage .coverage.5
+    coverage a- run --source=johnny manage.py test --traceback
 
   - DB_ENGINE=mysql CACHE_BACKEND=redis
-    coverage run --source=johnny manage.py test --traceback
-  - mv .coverage .coverage.6
+    coverage -a run --source=johnny manage.py test --traceback
 
 after_success:
-  - coverage combine
   - coveralls
 
 matrix:
