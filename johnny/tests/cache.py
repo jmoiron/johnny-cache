@@ -328,6 +328,7 @@ class MultiDbTest(TransactionQueryCacheBase):
         self.assertEqual(ostart.title, g2.title)
         self.assertTrue(hit)
 
+        managed(False, 'default')
         transaction.leave_transaction_management("default")
         transaction.leave_transaction_management("second")
 
