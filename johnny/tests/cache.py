@@ -10,24 +10,17 @@ try:
 except ImportError:  # Python < 3.0
     from Queue import Queue
 
-import django
 from django.conf import settings
 from django.core.paginator import Paginator
 from django.db import connection, connections, transaction
 from django.db.models import Q, Count, Sum
 from johnny import middleware, settings as johnny_settings, cache
 from johnny.cache import get_tables_for_query, invalidate
+from johnny.compat import is_managed, managed
 from johnny.signals import qc_hit, qc_miss, qc_skip
 from . import base
 from .testapp.models import (
     Genre, Book, Publisher, Person, PersonType, Issue24Model as i24m)
-
-
-if django.VERSION[:2] < (1, 6):
-    def atomic(f):
-        return f
-else:
-    from django.db.transaction import atomic
 
 
 # put tests in here to be included in the testing suite
@@ -74,8 +67,8 @@ class TransactionQueryCacheBase(base.TransactionJohnnyTestCase):
         super(TransactionQueryCacheBase, self)._post_teardown()
         if transaction.is_dirty():
             transaction.rollback()
-        if transaction.is_managed():
-            transaction.managed(False)
+        if is_managed():
+            managed(False)
 
 class BlackListTest(QueryCacheBase):
     fixtures = base.johnny_fixtures
@@ -137,16 +130,16 @@ class MultiDbTest(TransactionQueryCacheBase):
         g2.save(using='second')
         #fresh from cache since we saved each
         with self.assertNumQueries(1, using='default'):
-            with self.assertNumQueries(1, using='second'):
-                g1 = Genre.objects.using('default').get(pk=1)
-                g2 = Genre.objects.using('second').get(pk=1)
+            g1 = Genre.objects.using('default').get(pk=1)
+        with self.assertNumQueries(1, using='second'):
+            g2 = Genre.objects.using('second').get(pk=1)
         self.assertEqual(g1.title, "A default database")
         self.assertEqual(g2.title, "A second database")
         #should be a cache hit
         with self.assertNumQueries(0, using='default'):
-            with self.assertNumQueries(0, using='second'):
-                g1 = Genre.objects.using('default').get(pk=1)
-                g2 = Genre.objects.using('second').get(pk=1)
+            g1 = Genre.objects.using('default').get(pk=1)
+        with self.assertNumQueries(0, using='second'):
+            g2 = Genre.objects.using('second').get(pk=1)
 
     def test_cache_key_setting(self):
         """Tests that two databases use a single cached object when given the same DB cache key"""
@@ -168,9 +161,9 @@ class MultiDbTest(TransactionQueryCacheBase):
         g2.save(using='second')
         #fresh from cache since we saved each
         with self.assertNumQueries(1, using='default'):
-            with self.assertNumQueries(0, using='second'):
-                g1 = Genre.objects.using('default').get(pk=1)
-                g2 = Genre.objects.using('second').get(pk=1)
+            g1 = Genre.objects.using('default').get(pk=1)
+        with self.assertNumQueries(0, using='second'):
+            g2 = Genre.objects.using('second').get(pk=1)
         johnny_settings.DB_CACHE_KEYS = old_cache_keys
 
     def test_transactions(self):
@@ -195,7 +188,7 @@ class MultiDbTest(TransactionQueryCacheBase):
 
 
         # sanity check 
-        self.assertFalse(transaction.is_managed())
+        self.assertFalse(is_managed())
         self.assertFalse(transaction.is_dirty())
         self.assertTrue("default" in getattr(settings, "DATABASES"))
         self.assertTrue("second" in getattr(settings, "DATABASES"))
@@ -206,9 +199,9 @@ class MultiDbTest(TransactionQueryCacheBase):
         start_g1 = g1.title
 
         transaction.enter_transaction_management(using='default')
-        transaction.managed(using='default')
+        managed(using='default')
         transaction.enter_transaction_management(using='second')
-        transaction.managed(using='second')
+        managed(using='second')
 
         g1.title = "Testing a rollback"
         g2.title = "Testing a commit"
@@ -224,8 +217,8 @@ class MultiDbTest(TransactionQueryCacheBase):
 
         transaction.rollback(using='default')
         transaction.commit(using='second')
-        transaction.managed(False, "default")
-        transaction.managed(False, "second")
+        managed(False, using='default')
+        managed(False, using='second')
 
         #other thread should have seen rollback
         other("Genre.objects.using('default').get(pk=1)")
@@ -272,7 +265,7 @@ class MultiDbTest(TransactionQueryCacheBase):
                 return
 
         # sanity check 
-        self.assertFalse(transaction.is_managed())
+        self.assertFalse(is_managed())
         self.assertFalse(transaction.is_dirty())
         self.assertTrue("default" in getattr(settings, "DATABASES"))
         self.assertTrue("second" in getattr(settings, "DATABASES"))
@@ -282,9 +275,9 @@ class MultiDbTest(TransactionQueryCacheBase):
         g2 = Genre.objects.using("second").get(pk=1)
 
         transaction.enter_transaction_management(using='default')
-        transaction.managed(using='default')
+        managed(using='default')
         transaction.enter_transaction_management(using='second')
-        transaction.managed(using='second')
+        managed(using='second')
 
         g1.title = "Rollback savepoint"
         g1.save()
@@ -326,7 +319,7 @@ class MultiDbTest(TransactionQueryCacheBase):
             g2 = Genre.objects.using("second").get(pk=1)
 
         transaction.commit(using="second")
-        transaction.managed(False, "second")
+        managed(False, using='second')
 
         with self.assertNumQueries(0, using='second'):
             g2 = Genre.objects.using("second").get(pk=1)
@@ -339,7 +332,6 @@ class MultiDbTest(TransactionQueryCacheBase):
         self.assertEqual(ostart.title, g2.title)
         self.assertTrue(hit)
 
-        transaction.managed(False, "default")
         transaction.leave_transaction_management("default")
         transaction.leave_transaction_management("second")
 
@@ -644,14 +636,13 @@ class TransactionSupportTest(TransactionQueryCacheBase):
 
     def setUp(self):
         super(TransactionSupportTest, self).setUp()
-        if django.VERSION[:2] >= (1, 6):
-            transaction.set_autocommit(True)
+        managed(False)
 
     def tearDown(self):
-        if transaction.is_managed():
+        if is_managed():
             if transaction.is_dirty():
                 transaction.rollback()
-            transaction.managed(False)
+            managed(False)
             transaction.leave_transaction_management()
 
     def test_transaction_commit(self):
@@ -660,7 +651,7 @@ class TransactionSupportTest(TransactionQueryCacheBase):
             print("\n  Skipping test requiring multiple threads.")
             return
 
-        self.assertFalse(transaction.is_managed())
+        self.assertFalse(is_managed())
         self.assertFalse(transaction.is_dirty())
         cache.local.clear()
         q = Queue()
@@ -674,7 +665,7 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         self.assertEqual(ostart, start)
         # enter manual transaction management
         transaction.enter_transaction_management()
-        transaction.managed()
+        managed()
         start.title = 'Jackie Chan Novels'
         # local invalidation, this key should hit the localstore!
         nowlen = len(cache.local)
@@ -693,7 +684,7 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         hit, ostart = q.get()
         self.assertFalse(hit)
         self.assertEqual(ostart.title, start.title)
-        transaction.managed(False)
+        managed(False)
         transaction.leave_transaction_management()
 
     def test_transaction_rollback(self):
@@ -705,7 +696,7 @@ class TransactionSupportTest(TransactionQueryCacheBase):
             print("\n  Skipping test requiring multiple threads.")
             return
 
-        self.assertFalse(transaction.is_managed())
+        self.assertFalse(is_managed())
         self.assertFalse(transaction.is_dirty())
         cache.local.clear()
         q = Queue()
@@ -720,7 +711,7 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         self.assertEqual(ostart, start)
         # enter manual transaction management
         transaction.enter_transaction_management()
-        transaction.managed()
+        managed()
         start.title = 'Jackie Chan Novels'
         # local invalidation, this key should hit the localstore!
         nowlen = len(cache.local)
@@ -749,21 +740,19 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         self.assertTrue(hit)
         start = Genre.objects.get(id=1)
         self.assertEqual(ostart.title, start.title)
-        transaction.managed(False)
+        managed(False)
         transaction.leave_transaction_management()
 
-    @atomic
     def test_savepoint_rollback(self):
         """Tests rollbacks of savepoints"""
         if not connection.features.uses_savepoints:
             return
-        if django.VERSION[:2] < (1, 6):
-            self.assertFalse(transaction.is_managed())
-            self.assertFalse(transaction.is_dirty())
+        self.assertFalse(is_managed())
+        self.assertFalse(transaction.is_dirty())
         cache.local.clear()
-        if django.VERSION[:2] < (1, 6):
-            transaction.enter_transaction_management()
-            transaction.managed()
+        managed()
+        transaction.enter_transaction_management()
+
         g = Genre.objects.get(pk=1)
         start_title = g.title
         g.title = "Adventures in Savepoint World"
@@ -781,9 +770,6 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         transaction.rollback()
         g = Genre.objects.get(pk=1)
         self.assertEqual(g.title, start_title)
-        if django.VERSION[:2] < (1, 6):
-            transaction.managed(False)
-            transaction.leave_transaction_management()
 
     def test_savepoint_commit(self):
         """Tests a transaction commit (release)
@@ -791,11 +777,11 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         but at the point it was saved in the transaction"""
         if not connection.features.uses_savepoints:
             return
-        self.assertFalse(transaction.is_managed())
+        self.assertFalse(is_managed())
         self.assertFalse(transaction.is_dirty())
         cache.local.clear()
         transaction.enter_transaction_management()
-        transaction.managed()
+        managed()
         g = Genre.objects.get(pk=1)
         start_title = g.title
         g.title = "Adventures in Savepoint World"
@@ -819,18 +805,14 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         with self.assertNumQueries(0):
             g = Genre.objects.get(pk=1)
         self.assertEqual(g.title, "In the Void")
-        transaction.managed(False)
+        managed(False)
         transaction.leave_transaction_management()
 
 
 class TransactionManagerTestCase(base.TransactionJohnnyTestCase):
-
-    def setUp(self):
-        self.middleware = middleware.QueryCacheMiddleware()
-    
     def tearDown(self):
-        if transaction.is_managed():
-            transaction.managed(False)
+        if is_managed():
+            managed(False)
 
     def test_savepoint_localstore_flush(self):
         """
@@ -838,7 +820,7 @@ class TransactionManagerTestCase(base.TransactionJohnnyTestCase):
         be committed, i.e. flushed out from localstore into cache.
         """
         transaction.enter_transaction_management()
-        transaction.managed()
+        managed()
 
         TABLE_NAME = 'test_table'
         cache_backend = cache.get_backend()

@@ -1,7 +1,7 @@
-import django
 from django.db import transaction, connection, DEFAULT_DB_ALIAS
 
 from johnny import settings as johnny_settings
+from johnny.compat import is_managed
 from johnny.decorators import wraps, available_attrs
 
 
@@ -49,7 +49,7 @@ class TransactionManager(object):
             del self.local['trans_sids']
 
     def is_managed(self, using=None):
-        return transaction.is_managed(using=using)
+        return is_managed(using=using)
 
     def get(self, key, default=None, using=None):
         if self.is_managed(using) and self._patched_var:
