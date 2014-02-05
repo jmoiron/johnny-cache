@@ -31,36 +31,21 @@ before_script:
   - psql -c 'CREATE DATABASE johnny2_db OWNER travis;' -U postgres
 
 script:
-  - coverage run --source=johnny manage.py test --traceback
-  - mv .coverage .coverage.1
-
   - CACHE_BACKEND=memcached
     coverage run --source=johnny manage.py test --traceback
-  - mv .coverage .coverage.2
+  - mv .coverage .coverage.1
 
   - CACHE_BACKEND=redis
     coverage run --source=johnny manage.py test --traceback
-  - mv .coverage .coverage.3
-
-  - CACHE_BACKEND=filebased
-    coverage run --source=johnny manage.py test --traceback
-  - mv .coverage .coverage.4
-
-  - DB_ENGINE=postgresql_psycopg2
-    coverage run --source=johnny manage.py test --traceback
-  - mv .coverage .coverage.5
+  - mv .coverage .coverage.2
 
   - DB_ENGINE=postgresql_psycopg2 CACHE_BACKEND=memcached
     coverage run --source=johnny manage.py test --traceback
-  - mv .coverage .coverage.6
+  - mv .coverage .coverage.3
 
   - DB_ENGINE=postgresql_psycopg2 CACHE_BACKEND=redis
     coverage run --source=johnny manage.py test --traceback
-  - mv .coverage .coverage.7
-
-  - DB_ENGINE=postgresql_psycopg2 CACHE_BACKEND=filebased
-    coverage run --source=johnny manage.py test --traceback
-  - mv .coverage .coverage.8
+  - mv .coverage .coverage.4
 
 after_success:
   - coverage combine
