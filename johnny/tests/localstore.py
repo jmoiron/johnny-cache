@@ -82,7 +82,7 @@ class LocalStoreTest(TestCase):
             self.assertNotEquals(d['name'], 'Hi')
             self.assertEquals(d[d['name']], 1)
 
-    def test_localstore_clear_middleware(self):
+    def test_localstore_clear_middleware_process_response_behavior(self):
         from johnny import cache, middleware
         cache.local.clear()
         cache.local['eggs'] = 'spam'
@@ -91,4 +91,26 @@ class LocalStoreTest(TestCase):
         middleware.LocalStoreClearMiddleware().process_response(None, None)
         self.failUnless(len(cache.local) == 0)
 
+    def test_localstore_clear_middleware_process_exception_behavior(self):
+        """
+        This test checks that LocalStoreClearMiddleware.process_exception does not re-raises exception
+        that caused this method being called. According to Django docs it should not re-raise it.
+        """
+        from johnny import cache, middleware
+        cache.local.clear()
+        cache.local['eggs'] = 'spam'
+        cache.local['charlie'] = 'chaplin'
+        self.assertEqual(len(cache.local), 2)
 
+        # This cascaded try-except if creates a context similar to the one on which Django calls 'process_exception'
+        try:
+            # Some exception occurred dureing rquest
+            raise ValueError
+        except ValueError:
+            # Django catched it and start to call 'process_exception' method (if any) for each installed middleware
+            try:
+                middleware.LocalStoreClearMiddleware().process_exception(None, None)
+            except ValueError:
+                self.fail("LocalStoreClearMiddleware.process_exception re-raised exception!")
+
+        self.assertEqual(len(cache.local), 0)

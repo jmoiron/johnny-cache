@@ -104,13 +104,6 @@ class MultiDbTest(TransactionQueryCacheBase):
         t.start()
         t.join()
 
-    def _other(self, cmd, q):
-        def _innter(cmd):
-            q.put(eval(cmd))
-        t = Thread(target=_inner, args=(cmd,))
-        t.start()
-        t.join()
-
     def test_basic_queries(self):
         """Tests basic queries and that the cache is working for multiple db's"""
         if len(getattr(settings, "DATABASES", [])) <= 1:
@@ -208,7 +201,7 @@ class MultiDbTest(TransactionQueryCacheBase):
         from testapp.models import Genre
 
 
-        # sanity check 
+        # sanity check
         self.failUnless(transaction.is_managed() == False)
         self.failUnless(transaction.is_dirty() == False)
         self.failUnless("default" in getattr(settings, "DATABASES"))
@@ -229,7 +222,7 @@ class MultiDbTest(TransactionQueryCacheBase):
         g1.save()
         g2.save()
 
-        # test outside of transaction, should be cache hit and 
+        # test outside of transaction, should be cache hit and
         # not contain the local changes
         other("Genre.objects.using('default').get(pk=1)")
         hit, ostart = q.get()
@@ -294,7 +287,7 @@ class MultiDbTest(TransactionQueryCacheBase):
                     print "\n  Skipping test requiring savepoints."
                     return
 
-        # sanity check 
+        # sanity check
         self.failUnless(transaction.is_managed() == False)
         self.failUnless(transaction.is_dirty() == False)
         self.failUnless("default" in getattr(settings, "DATABASES"))
@@ -339,7 +332,7 @@ class MultiDbTest(TransactionQueryCacheBase):
         self.failUnless(g2.title == "Committed savepoint")
         transaction.savepoint_commit(sid2, using="second")
 
-        #other thread should still see original version even 
+        #other thread should still see original version even
         #after savepoint commit
         other("Genre.objects.using('second').get(pk=1)")
         hit, ostart = q.get()
@@ -615,7 +608,7 @@ class MultiModelTest(QueryCacheBase):
         #can't determine the queries here, 1.1 and 1.2 uses them differently
 
         connection.queries = []
-        #many to many should be invalidated, 
+        #many to many should be invalidated,
         #person is not invalidated since we just want
         #the many to many table to be
         p1 = Person.objects.get(pk=1)
@@ -707,7 +700,7 @@ class TransactionSupportTest(TransactionQueryCacheBase):
             queue.put(msg)
             if connections is not None:
                 #this is to fix a race condition with the
-                #thread to ensure that we close it before 
+                #thread to ensure that we close it before
                 #the next test runs
                 connections['default'].close()
         t = Thread(target=_inner, args=(query,))
@@ -775,6 +768,37 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         self.failUnless(ostart.title == start.title)
         transaction.managed(False)
         transaction.leave_transaction_management()
+
+    def test_transaction_commit_unless_managed(self):
+        """
+        Test 'commit unless managed' support in Johnny
+
+        Tests bugfix provided in PR#34
+        """
+        # 1st condition - patch Django transaction
+        from johnny import cache
+        cache.patch()
+
+        # 2nd condition to reproduce the bug - work in auto-commit mode
+        from django.db import transaction
+        if transaction.is_managed(using='default'):
+            transaction.leave_transaction_management(using='default')
+
+        from testapp.models import Issue24Model
+
+        # Simulating situation when there are 'dirty savepoints'
+        # It is similar to behavior of django.contrib.sessions.backends.db.SessionStore#save
+        transaction.savepoint(using='default')
+
+        model_1 = Issue24Model(one=1, two=1)
+        model_1.save(using='default')  # Calls transaction.commit_unless_managed
+
+        Issue24Model.objects.get_or_create(one=2, two=2)  # Creates and commits savepoint
+
+        try:
+            Issue24Model.objects.all().delete()
+        except KeyError:
+            self.fail("Savepoints collision due to unpatched 'transaction.commit_unless_managed'!")
 
     def test_transaction_rollback(self):
         """Tests johnny's handling of transaction rollbacks.
@@ -924,7 +948,7 @@ class TransactionManagerTestCase(base.TransactionJohnnyTestCase):
 
     def setUp(self):
         self.middleware = middleware.QueryCacheMiddleware()
-    
+
     def tearDown(self):
         from django.db import transaction
         if transaction.is_managed():
@@ -944,9 +968,9 @@ class TransactionManagerTestCase(base.TransactionJohnnyTestCase):
         cache_backend.patch()
         keyhandler = cache_backend.keyhandler
         keygen = keyhandler.keygen
-        
+
         tm = cache_backend.cache_backend
-        
+
         # First, we set one key-val pair generated for our non-existing table.
         table_key = keygen.gen_table_key(TABLE_NAME)
         tm.set(table_key, 'val1')
@@ -954,7 +978,7 @@ class TransactionManagerTestCase(base.TransactionJohnnyTestCase):
         # Then we create a savepoint.
         # The key-value pair is moved into 'trans_sids' item of localstore.
         tm._create_savepoint('savepoint1')
-        
+
         # We then commit all the savepoints (i.e. only one in this case)
         # The items stored in 'trans_sids' should be moved back to the
         # top-level dictionary of our localstore
