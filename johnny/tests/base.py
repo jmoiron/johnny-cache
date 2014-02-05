@@ -130,7 +130,7 @@ def supports_transactions(con):
     features = con.features
     vendor = con.vendor
     if features.supports_transactions:
-        if vendor == 'mysql' and not features._storage_engine == 'InnoDB':
+        if vendor == 'mysql' and features._mysql_storage_engine != 'InnoDB':
             print('MySQL connection reports transactions supported '
                   'but storage engine != InnoDB.')
             return False
