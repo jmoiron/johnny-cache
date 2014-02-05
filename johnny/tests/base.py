@@ -8,8 +8,8 @@ try:
     from queue import Queue
 except ImportError:  # Python < 3.0
     from Queue import Queue
+from pprint import pformat
 
-import django
 from django.test import TestCase, TransactionTestCase
 from django.conf import settings
 from django.core.management import call_command
@@ -17,6 +17,8 @@ from django.db.models.loading import load_app
 
 from johnny import settings as johnny_settings
 from johnny.decorators import wraps, available_attrs
+from johnny.middleware import QueryCacheMiddleware
+from johnny.signals import qc_hit, qc_miss, qc_skip
 
 # order matters here;  I guess we aren't deferring foreign key checking :\
 johnny_fixtures = ['authors.json', 'genres.json', 'publishers.json', 'books.json']
@@ -25,7 +27,6 @@ def show_johnny_signals(hit=None, miss=None):
     """A decorator that can be put on a test function that will show the
     johnny hit/miss signals by default, or do what is provided by the hit
     and miss keyword args."""
-    from pprint import pformat
     def _hit(*args, **kwargs):
         print("hit:\n\t%s\n\t%s\n" % (pformat(args), pformat(kwargs)))
     def _miss(*args, **kwargs):
@@ -35,7 +36,6 @@ def show_johnny_signals(hit=None, miss=None):
     def deco(func):
         @wraps(func, assigned=available_attrs(func))
         def wrapped(*args, **kwargs):
-            from johnny.signals import qc_hit, qc_miss
             qc_hit.connect(hit)
             qc_miss.connect(miss)
             try:
@@ -87,7 +87,6 @@ class TransactionJohnnyTestCase(TransactionTestCase):
 
 class TransactionJohnnyWebTestCase(TransactionJohnnyTestCase):
     def _pre_setup(self):
-        from johnny import middleware
         self.saved_MIDDLEWARE_CLASSES = settings.MIDDLEWARE_CLASSES
         if getattr(self.__class__, 'middleware', None):
             settings.MIDDLEWARE_CLASSES = self.__class__.middleware
@@ -96,7 +95,7 @@ class TransactionJohnnyWebTestCase(TransactionJohnnyTestCase):
         self.saved_TEMPLATE_LOADERS = settings.TEMPLATE_LOADERS
         if 'django.template.loaders.app_directories.Loader' not in settings.TEMPLATE_LOADERS:
             settings.TEMPLATE_LOADERS += ('django.template.loaders.app_directories.Loader',)
-        self.middleware = middleware.QueryCacheMiddleware()
+        self.middleware = QueryCacheMiddleware()
         self.saved_ROOT_URLCONF = settings.ROOT_URLCONF
         settings.ROOT_URLCONF = 'johnny.tests.testapp.urls'
         super(TransactionJohnnyWebTestCase, self)._pre_setup()
@@ -114,7 +113,6 @@ class message_queue(object):
     handlers use weakrefs, so if we don't save references to this object they
     will get gc'd pretty fast."""
     def __init__(self):
-        from johnny.signals import qc_hit, qc_miss, qc_skip
         self.q = Queue()
         qc_hit.connect(self._hit)
         qc_miss.connect(self._miss)

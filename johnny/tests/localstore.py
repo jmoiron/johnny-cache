@@ -6,8 +6,14 @@ forever, and because it aims to keep coherency despite that it's important
 that it be tested thoroughly to make sure no changes introduce the possibility
 of stale data in the cache."""
 
+try:
+    from queue import Queue
+except ImportError:  # Python < 3.0
+    from Queue import Queue
+from threading import Thread, current_thread
+from time import sleep
 from django.test import TestCase
-from johnny import localstore
+from johnny import localstore, cache, middleware
 
 class LocalStoreTest(TestCase):
     def test_basic_operation(self):
@@ -41,12 +47,6 @@ class LocalStoreTest(TestCase):
         self.assertEqual(len(store.mget('*_2')), 1)
 
     def test_thread_locality(self):
-        try:
-            from queue import Queue
-        except ImportError:  # Python < 3.0
-            from Queue import Queue
-        from threading import Thread, current_thread
-        from time import sleep
         store = localstore.LocalStore()
         store['name'] = "Hi"
         q = Queue()
@@ -77,7 +77,6 @@ class LocalStoreTest(TestCase):
             self.assertEqual(d[d['name']], 1)
 
     def test_localstore_clear_middleware(self):
-        from johnny import cache, middleware
         cache.local.clear()
         cache.local['eggs'] = 'spam'
         cache.local['charlie'] = 'chaplin'
