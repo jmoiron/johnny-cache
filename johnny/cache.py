@@ -160,6 +160,10 @@ def get_tables_for_query_pre_16(query):
     return list(set(tables))
 
 
+if django.VERSION[:2] < (1, 6):
+    get_tables_for_query = get_tables_for_query_pre_16
+
+
 # The KeyGen is used only to generate keys.  Some of these keys will be used
 # directly in the cache, while others are only general purpose functions to
 # generate hashes off of one or more values.
@@ -339,10 +343,7 @@ class QueryCacheBackend(object):
             key, val = None, NotInCache()
             # check the blacklist for any of the involved tables;  if it's not
             # there, then look for the value in the cache.
-            if django.VERSION[:2] < (1, 6):
-                tables = get_tables_for_query_pre_16(cls.query)
-            else:
-                tables = get_tables_for_query(cls.query)
+            tables = get_tables_for_query(cls.query)
             # if the tables are blacklisted, send a qc_skip signal
             blacklisted = disallowed_table(*tables)
 

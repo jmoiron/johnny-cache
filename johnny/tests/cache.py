@@ -10,6 +10,7 @@ try:
 except ImportError:  # Python < 3.0
     from Queue import Queue
 
+import django
 from django.conf import settings
 from django.db import connection, connections, transaction
 from johnny import middleware

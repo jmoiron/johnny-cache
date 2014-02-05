@@ -56,15 +56,12 @@ class TestJohnnyTransactionMiddleware(base.TransactionJohnnyWebTestCase):
         'django.middleware.locale.LocaleMiddleware',
         'django.middleware.gzip.GZipMiddleware',
         'django.middleware.http.ConditionalGetMiddleware',
+        'johnny.middleware.CommittingTransactionMiddleware',
     )
 
     def setUp(self):
         super(TestJohnnyTransactionMiddleware, self).setUp()
-        if django.VERSION < (1, 6):
-            self.middleware += (
-                'johnny.middleware.CommittingTransactionMiddleware',
-            )
-        else:
+        if django.VERSION[:2] >= (1, 6):
             transaction.set_autocommit(True)
 
     def test_queries_from_templates(self):

@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """Middleware classes for johnny cache."""
+import django
 
 from django.middleware import transaction as trans_middleware
 from django.db import transaction
@@ -54,12 +55,15 @@ class CommittingTransactionMiddleware(trans_middleware.TransactionMiddleware):
     transactions, even if they aren't dirty.
     """
     def process_response(self, request, response):
-        autocommit = transaction.get_autocommit()
-        if transaction.is_managed():
+        """Commits and leaves transaction management."""
+        if django.VERSION[:2] >= (1, 6) and transaction.get_autocommit():
+            return response
+        if transaction.is_dirty():
             try:
                 transaction.commit()
-            except:
-                pass
-            transaction.leave_transaction_management()
-        transaction.set_autocommit(autocommit)
+            except Exception:
+                transaction.rollback()
+                transaction.leave_transaction_management()
+                raise
+        transaction.leave_transaction_management()
         return response
