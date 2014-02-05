@@ -33,6 +33,19 @@ else:
 # put tests in here to be included in the testing suite
 __all__ = ['MultiDbTest', 'SingleModelTest', 'MultiModelTest', 'TransactionSupportTest', 'BlackListTest', 'TransactionManagerTestCase']
 
+
+def is_multithreading_safe(db_using=None):
+    # SQLite and the file-based cache are not thread-safe.
+    if db_using is None:
+        return all(is_multithreading_safe(db_using=db_name)
+                   for db_name in settings.DATABASES)
+    db_engine = settings.DATABASES.get(db_using, {}).get('ENGINE', 'sqlite3')
+    cache_engine = settings.CACHES.get('default', {}).get('BACKEND',
+                                                          'FileBasedCache')
+    return not db_engine.endswith('sqlite3') \
+        and not cache_engine.endswith('FileBasedCache')
+
+
 def _pre_setup(self):
     self.saved_DISABLE_SETTING = getattr(johnny_settings, 'DISABLE_QUERYSET_CACHE', False)
     johnny_settings.DISABLE_QUERYSET_CACHE = False
@@ -166,16 +179,16 @@ class MultiDbTest(TransactionQueryCacheBase):
         if len(getattr(settings, "DATABASES", [])) <= 1:
             print("\n  Skipping multi database tests")
             return
-        for db in settings.DATABASES.values():
-            if db['ENGINE'] == 'sqlite3':
-                print("\n  Skipping test requiring multiple threads.")
-                return
 
-            for conname in connections:
-                con = connections[conname]
-                if not base.supports_transactions(con):
-                    print("\n  Skipping test requiring transactions.")
-                    return
+        if not is_multithreading_safe():
+            print("\n  Skipping test requiring multiple threads.")
+            return
+
+        for conname in connections:
+            con = connections[conname]
+            if not base.supports_transactions(con):
+                print("\n  Skipping test requiring transactions.")
+                return
 
         q = Queue()
         other = lambda x: self._run_threaded(x, q, {'Genre': Genre})
@@ -247,15 +260,16 @@ class MultiDbTest(TransactionQueryCacheBase):
         if len(getattr(settings, "DATABASES", [])) <= 1:
             print("\n  Skipping multi database tests")
             return
+
+        if not is_multithreading_safe():
+            print("\n  Skipping test requiring multiple threads.")
+            return
+
         for name, db in settings.DATABASES.items():
-            if name in ('default', 'second'):
-                if 'sqlite' in db['ENGINE']:
-                    print("\n  Skipping test requiring multiple threads.")
-                    return
-                con = connections[name]
-                if not con.features.uses_savepoints:
-                    print("\n  Skipping test requiring savepoints.")
-                    return
+            con = connections[name]
+            if not con.features.uses_savepoints:
+                print("\n  Skipping test requiring savepoints.")
+                return
 
         # sanity check 
         self.assertFalse(transaction.is_managed())
@@ -642,7 +656,7 @@ class TransactionSupportTest(TransactionQueryCacheBase):
 
     def test_transaction_commit(self):
         """Test transaction support in Johnny."""
-        if settings.DATABASES.get('default', {}).get('ENGINE', '').endswith('sqlite3'):
+        if not is_multithreading_safe(db_using='default'):
             print("\n  Skipping test requiring multiple threads.")
             return
 
@@ -687,7 +701,7 @@ class TransactionSupportTest(TransactionQueryCacheBase):
 
         Similar to the commit, this sets up a write to a db in a transaction,
         reads from it (to force a cache write of sometime), then rolls back."""
-        if settings.DATABASES.get('default', {}).get('ENGINE', '').endswith('sqlite3'):
+        if not is_multithreading_safe(db_using='default'):
             print("\n  Skipping test requiring multiple threads.")
             return
 
