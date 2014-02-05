@@ -318,7 +318,6 @@ class QueryCacheBackend(object):
                     raise EmptyResultSet
             except EmptyResultSet:
                 if result_type == MULTI:
-                    # this was moved in 1.2 to compiler
                     return empty_iter()
                 else:
                     return

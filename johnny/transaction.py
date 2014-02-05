@@ -117,7 +117,6 @@ class TransactionManager(object):
     def _patched(self, original, commit=True, unless_managed=False):
         @wraps(original, assigned=available_attrs(original))
         def newfun(using=None):
-            #1.2 version
             original(using=using)
             # copying behavior of original func
             # if it is an 'unless_managed' version we should do nothing if transaction is managed
