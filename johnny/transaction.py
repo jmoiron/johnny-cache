@@ -6,6 +6,7 @@ try:
 except:
     DEFUALT_DB_ALIAS = None
 
+from johnny import settings
 from johnny.decorators import wraps, available_attrs
 
 
@@ -79,6 +80,7 @@ class TransactionManager(object):
     def _trunc_using(self, using):
         if using is None:
             using = DEFAULT_DB_ALIAS
+        using = settings.DB_CACHE_KEYS[using]
         if len(using) > 100:
             using = using[0:68] + self.keygen.gen_key(using[68:])
         return using
