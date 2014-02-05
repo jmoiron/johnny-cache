@@ -17,7 +17,6 @@ from django.db.models.loading import load_app
 
 from johnny import settings as johnny_settings
 from johnny.decorators import wraps, available_attrs
-from johnny.middleware import QueryCacheMiddleware
 from johnny.signals import qc_hit, qc_miss, qc_skip
 
 # order matters here;  I guess we aren't deferring foreign key checking :\
@@ -88,20 +87,18 @@ class TransactionJohnnyTestCase(TransactionTestCase):
 class TransactionJohnnyWebTestCase(TransactionJohnnyTestCase):
     def _pre_setup(self):
         self.saved_MIDDLEWARE_CLASSES = settings.MIDDLEWARE_CLASSES
-        if getattr(self.__class__, 'middleware', None):
-            settings.MIDDLEWARE_CLASSES = self.__class__.middleware
+        if getattr(self, 'middlewares', None):
+            settings.MIDDLEWARE_CLASSES = self.middlewares
         self.saved_DISABLE_SETTING = getattr(johnny_settings, 'DISABLE_QUERYSET_CACHE', False)
         johnny_settings.DISABLE_QUERYSET_CACHE = False
         self.saved_TEMPLATE_LOADERS = settings.TEMPLATE_LOADERS
         if 'django.template.loaders.app_directories.Loader' not in settings.TEMPLATE_LOADERS:
             settings.TEMPLATE_LOADERS += ('django.template.loaders.app_directories.Loader',)
-        self.middleware = QueryCacheMiddleware()
         self.saved_ROOT_URLCONF = settings.ROOT_URLCONF
         settings.ROOT_URLCONF = 'johnny.tests.testapp.urls'
         super(TransactionJohnnyWebTestCase, self)._pre_setup()
 
     def _post_teardown(self):
-        self.middleware.unpatch()
         johnny_settings.DISABLE_QUERYSET_CACHE = self.saved_DISABLE_SETTING
         settings.MIDDLEWARE_CLASSES = self.saved_MIDDLEWARE_CLASSES
         settings.ROOT_URLCONF = self.saved_ROOT_URLCONF
