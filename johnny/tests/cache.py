@@ -166,15 +166,10 @@ class MultiDbTest(TransactionQueryCacheBase):
         if len(getattr(settings, "DATABASES", [])) <= 1:
             print("\n  Skipping multi database tests")
             return
-        if hasattr(settings, 'DATABASE_ENGINE'):
-            if settings.DATABASE_ENGINE == 'sqlite3':
+        for db in settings.DATABASES.values():
+            if db['ENGINE'] == 'sqlite3':
                 print("\n  Skipping test requiring multiple threads.")
                 return
-        else:
-            for db in settings.DATABASES.values():
-                if db['ENGINE'] == 'sqlite3':
-                    print("\n  Skipping test requiring multiple threads.")
-                    return
 
             for conname in connections:
                 con = connections[conname]
