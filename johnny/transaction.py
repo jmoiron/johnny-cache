@@ -159,7 +159,8 @@ class TransactionManager(object):
         self._clear(using)
         #append the key to the savepoint stack
         sids = self._get_sid(using)
-        sids.append(key)
+        if len(sids) > 0 and sids[-1] != key:
+            sids.append(key)
 
     def _rollback_savepoint(self, sid, using=None):
         sids = self._get_sid(using)
