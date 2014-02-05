@@ -24,7 +24,7 @@ __all__ = ['MultiDbTest', 'SingleModelTest', 'MultiModelTest', 'TransactionSuppo
 
 
 def is_multithreading_safe(db_using=None):
-    # SQLite and the file-based cache are not thread-safe.
+    # SQLite is not thread-safe.
     if db_using is None:
         return all(is_multithreading_safe(db_using=db_name)
                    for db_name in settings.DATABASES)
