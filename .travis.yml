@@ -49,7 +49,7 @@ script:
     coverage run -a --source=johnny manage.py test --traceback
 
   - DB_ENGINE=mysql CACHE_BACKEND=memcached
-    coverage a- run --source=johnny manage.py test --traceback
+    coverage run -a --source=johnny manage.py test --traceback
 
   - DB_ENGINE=mysql CACHE_BACKEND=redis
     coverage run -a --source=johnny manage.py test --traceback
