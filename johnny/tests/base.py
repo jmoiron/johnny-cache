@@ -4,10 +4,6 @@
 """Base test class for Johnny Cache Tests."""
 
 from __future__ import print_function
-try:
-    from queue import Queue
-except ImportError:  # Python < 3.0
-    from Queue import Queue
 from pprint import pformat
 
 from django.test import TestCase, TransactionTestCase
@@ -16,6 +12,7 @@ from django.core.management import call_command
 from django.db.models.loading import load_app
 
 from johnny import settings as johnny_settings
+from johnny.compat import Queue
 from johnny.decorators import wraps, available_attrs
 from johnny.signals import qc_hit, qc_miss, qc_skip
 

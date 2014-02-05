@@ -6,14 +6,11 @@ forever, and because it aims to keep coherency despite that it's important
 that it be tested thoroughly to make sure no changes introduce the possibility
 of stale data in the cache."""
 
-try:
-    from queue import Queue
-except ImportError:  # Python < 3.0
-    from Queue import Queue
 from threading import Thread, current_thread
 from time import sleep
 from django.test import TestCase
 from johnny import localstore, cache, middleware
+from johnny.compat import Queue
 
 class LocalStoreTest(TestCase):
     def test_basic_operation(self):

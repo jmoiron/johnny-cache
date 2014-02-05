@@ -5,20 +5,11 @@ from uuid import uuid4
 
 import django
 from django.db.models.signals import post_save, post_delete
-from django.db.models.sql import compiler
-
-try:
-    from django.utils.encoding import force_bytes, force_text
-    from django.utils.six import string_types, text_type
-except ImportError:  # Django < 1.4.2
-    force_bytes = str
-    force_text = unicode
-    string_types = (str, unicode)
-    text_type = unicode
-
 
 from . import localstore, signals
 from . import settings
+from .compat import (
+    force_bytes, force_text, string_types, text_type, empty_iter)
 from .decorators import wraps, available_attrs
 from .transaction import TransactionManager
 
@@ -29,13 +20,6 @@ class NotInCache(object):
 
 no_result_sentinel = "22c52d96-156a-4638-a38d-aae0051ee9df"
 local = localstore.LocalStore()
-
-def empty_iter():
-    #making this a function as the empty_iter has changed between 1.4 and 1.5
-    if django.VERSION[:2] >= (1, 5):
-        return iter([])
-    else:
-        return compiler.empty_iter()
 
 
 def disallowed_table(*tables):

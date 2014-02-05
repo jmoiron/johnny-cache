@@ -5,10 +5,6 @@
 
 from __future__ import print_function
 from threading import Thread
-try:
-    from queue import Queue
-except ImportError:  # Python < 3.0
-    from Queue import Queue
 
 from django.conf import settings
 from django.core.paginator import Paginator
@@ -16,7 +12,7 @@ from django.db import connection, connections, transaction
 from django.db.models import Q, Count, Sum
 from johnny import middleware, settings as johnny_settings, cache
 from johnny.cache import get_tables_for_query, invalidate
-from johnny.compat import is_managed, managed
+from johnny.compat import is_managed, managed, Queue
 from johnny.signals import qc_hit, qc_miss, qc_skip
 from . import base
 from .testapp.models import (
