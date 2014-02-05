@@ -801,8 +801,9 @@ class TransactionSupportTest(TransactionQueryCacheBase):
             self.assertFalse(transaction.is_managed())
             self.assertFalse(transaction.is_dirty())
         cache.local.clear()
-        if django.VERSION[:2] < (1,6):
+        if django.VERSION[:2] < (1, 6):
             transaction.enter_transaction_management()
+            transaction.managed()
         g = Genre.objects.get(pk=1)
         start_title = g.title
         g.title = "Adventures in Savepoint World"
@@ -821,6 +822,7 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         g = Genre.objects.get(pk=1)
         self.assertEqual(g.title, start_title)
         if django.VERSION[:2] < (1, 6):
+            transaction.managed(False)
             transaction.leave_transaction_management()
 
     def test_savepoint_commit(self):
