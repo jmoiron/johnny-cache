@@ -1,10 +1,12 @@
 """Johnny's main caching functionality."""
 
 from hashlib import md5
+from types import MethodType
 from uuid import uuid4
 
 import django
 from django.db.models.signals import post_save, post_delete
+from django.utils import six
 
 from . import localstore, signals
 from . import settings
@@ -15,7 +17,7 @@ from .transaction import TransactionManager
 
 
 class NotInCache(object):
-    #This is used rather than None to properly cache empty querysets
+    # This is used rather than None to properly cache empty querysets
     pass
 
 no_result_sentinel = "22c52d96-156a-4638-a38d-aae0051ee9df"
@@ -44,10 +46,12 @@ def get_backend(**kwargs):
     cls = QueryCacheBackend
     return cls(**kwargs)
 
+
 def enable():
     """Enable johnny-cache, for use in scripts, management commands, async
     workers, or other code outside the django request flow."""
     get_backend().patch()
+
 
 def disable():
     """Disable johnny-cache.  This will disable johnny-cache for the whole
@@ -55,7 +59,8 @@ def disable():
     tables will not be invalidated properly.  Use Carefully."""
     get_backend().unpatch()
 
-patch,unpatch = enable,disable
+patch, unpatch = enable, disable
+
 
 def resolve_table(x):
     """Return a table name for x, where x is either a model instance or a string."""
@@ -84,7 +89,7 @@ def get_tables_for_query(query):
     """
     from django.db.models.sql.where import WhereNode, SubqueryConstraint
     from django.db.models.query import QuerySet
-    tables = [v[0] for v in getattr(query,'alias_map',{}).values()]
+    tables = [v[0] for v in getattr(query, 'alias_map', {}).values()]
 
     def get_sub_query_tables(node):
         query = node.query_object
@@ -93,7 +98,7 @@ def get_tables_for_query(query):
         else:
             query = query._clone()
         query = query.query
-        return [v[0] for v in getattr(query, 'alias_map',{}).values()]
+        return [v[0] for v in getattr(query, 'alias_map', {}).values()]
 
     def get_tables(node, tables):
         if isinstance(node, SubqueryConstraint):
@@ -115,6 +120,7 @@ def get_tables_for_query(query):
 
     return list(set(tables))
 
+
 def get_tables_for_query_pre_16(query):
     """
     Takes a Django 'query' object and returns all tables that will be used in
@@ -123,7 +129,7 @@ def get_tables_for_query_pre_16(query):
     """
     from django.db.models.sql.where import WhereNode
     from django.db.models.query import QuerySet
-    tables = [v[0] for v in getattr(query,'alias_map',{}).values()]
+    tables = [v[0] for v in getattr(query, 'alias_map', {}).values()]
 
     def get_tables(node, tables):
         for child in node.children:
@@ -153,6 +159,7 @@ if django.VERSION[:2] < (1, 6):
 # generate hashes off of one or more values.
 
 class KeyGen(object):
+
     """This class is responsible for generating keys."""
 
     def __init__(self, prefix):
@@ -204,9 +211,11 @@ class KeyGen(object):
 
 
 class KeyHandler(object):
+
     """Handles pulling and invalidating the key from from the cache based
     on the table names.  Higher-level logic dealing with johnny cache specific
     keys go in this class."""
+
     def __init__(self, cache_backend, keygen=KeyGen, prefix=None):
         self.prefix = prefix
         self.keygen = keygen(prefix)
@@ -223,7 +232,7 @@ class KeyHandler(object):
         """Creates a random generation value for a single table name"""
         key = self.keygen.gen_table_key(table, db)
         val = self.cache_backend.get(key, None, db)
-        #if local.get('in_test', None): print force_bytes(val).ljust(32), key
+        # if local.get('in_test', None): print force_bytes(val).ljust(32), key
         if val is None:
             val = self.keygen.random_generator()
             self.cache_backend.set(key, val, settings.MIDDLEWARE_SECONDS, db)
@@ -237,7 +246,7 @@ class KeyHandler(object):
             generations.append(self.get_single_generation(table, db))
         key = self.keygen.gen_multi_key(generations, db)
         val = self.cache_backend.get(key, None, db)
-        #if local.get('in_test', None): print force_bytes(val).ljust(32), key
+        # if local.get('in_test', None): print force_bytes(val).ljust(32), key
         if val is None:
             val = self.keygen.random_generator()
             self.cache_backend.set(key, val, settings.MIDDLEWARE_SECONDS, db)
@@ -264,8 +273,22 @@ class KeyHandler(object):
         return '%s_%s_query_%s.%s' % (self.prefix, using, generation, suffix)
 
 
+def _get_original(original, instance, *args, **kwargs):
+    """
+    Return the value from the call to the original method.
+    """
+    if original.im_class == instance.__class__:
+        return original(instance, *args, **kwargs)
+    else:  # allow compiler proxies as well
+        if six.PY3:
+            return MethodType(original.__func__, instance)(*args, **kwargs)
+        else:
+            return MethodType(original.__func__, instance, instance.__class__)(*args, **kwargs)
+
+
 # XXX: Thread safety concerns?  Should we only need to patch once per process?
 class QueryCacheBackend(object):
+
     """This class is the engine behind the query cache. It reads the queries
     going through the django Query and returns from the cache using
     the generation keys, or on a miss from the database and caches the results.
@@ -311,7 +334,7 @@ class QueryCacheBackend(object):
                 result_type = kwargs.get('result_type', MULTI)
 
             if any([isinstance(cls, c) for c in self._write_compilers]):
-                return original(cls, *args, **kwargs)
+                return _get_original(original, cls, *args, **kwargs)
             try:
                 sql, params = cls.as_sql()
                 if not sql:
@@ -337,8 +360,8 @@ class QueryCacheBackend(object):
 
             if blacklisted:
                 signals.qc_skip.send(sender=cls, tables=tables,
-                    query=(sql, params, ordering_aliases),
-                    key=key)
+                                     query=(sql, params, ordering_aliases),
+                                     key=key)
             if tables and not blacklisted:
                 gen_key = self.keyhandler.get_generation(*tables, **{'db': db})
                 key = self.keyhandler.sql_key(gen_key, sql, params,
@@ -351,22 +374,22 @@ class QueryCacheBackend(object):
                     val = []
 
                 signals.qc_hit.send(sender=cls, tables=tables,
-                        query=(sql, params, ordering_aliases),
-                        size=len(val), key=key)
+                                    query=(sql, params, ordering_aliases),
+                                    size=len(val), key=key)
                 return val
 
             if not blacklisted:
                 signals.qc_miss.send(sender=cls, tables=tables,
-                    query=(sql, params, ordering_aliases),
-                    key=key)
+                                     query=(sql, params, ordering_aliases),
+                                     key=key)
 
-            val = original(cls, *args, **kwargs)
+            val = _get_original(original, cls, *args, **kwargs)
 
             if hasattr(val, '__iter__'):
-                #Can't permanently cache lazy iterables without creating
-                #a cacheable data structure. Note that this makes them
-                #no longer lazy...
-                #todo - create a smart iterable wrapper
+                # Can't permanently cache lazy iterables without creating
+                # a cacheable data structure. Note that this makes them
+                # no longer lazy...
+                # todo - create a smart iterable wrapper
                 val = list(val)
             if key is not None:
                 if not val:
@@ -383,14 +406,14 @@ class QueryCacheBackend(object):
             from django.db.models.sql import compiler
             # we have to do this before we check the tables, since the tables
             # are actually being set in the original function
-            ret = original(cls, *args, **kwargs)
+            ret = _get_original(original, cls, *args, **kwargs)
 
             if isinstance(cls, compiler.SQLInsertCompiler):
-                #Inserts are a special case where cls.tables
-                #are not populated.
+                # Inserts are a special case where cls.tables
+                # are not populated.
                 tables = [cls.query.model._meta.db_table]
             else:
-                #if cls.query.tables != list(cls.query.table_map):
+                # if cls.query.tables != list(cls.query.table_map):
                 #    pass
                 #tables = list(cls.query.table_map)
                 tables = cls.query.tables
@@ -448,9 +471,9 @@ class QueryCacheBackend(object):
             tables.add(table)
 
             try:
-                 instance._meta._related_objects_cache
+                instance._meta._related_objects_cache
             except AttributeError:
-                 instance._meta._fill_related_objects_cache()
+                instance._meta._fill_related_objects_cache()
 
             for obj in instance._meta._related_objects_cache.keys():
                 obj_table = obj.model._meta.db_table
