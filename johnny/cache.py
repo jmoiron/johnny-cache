@@ -2,6 +2,7 @@
 
 import re
 import time
+from types import MethodType
 from uuid import uuid4
 
 try:
@@ -19,6 +20,7 @@ import django
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models.signals import post_save, post_delete
 from django.db.models.sql import compiler
+from django.utils import six
 
 try:
     any
@@ -258,6 +260,19 @@ class KeyHandler(object):
         return '%s_%s_query_%s.%s' % (self.prefix, using, generation, suffix)
 
 
+def _get_original(original, instance, *args, **kwargs):
+    """
+    Return the value from the call to the original method.
+    """
+    if original.im_class == instance.__class__:
+        return original(instance, *args, **kwargs)
+    else:  # allow compiler proxies as well
+        if six.PY3:
+            return MethodType(original.__func__, instance)(*args, **kwargs)
+        else:
+            return MethodType(original.__func__, instance, instance.__class__)(*args, **kwargs)
+
+
 # XXX: Thread safety concerns?  Should we only need to patch once per process?
 class QueryCacheBackend(object):
     """This class is the engine behind the query cache. It reads the queries
@@ -305,7 +320,7 @@ class QueryCacheBackend(object):
                 result_type = kwargs.get('result_type', MULTI)
 
             if any([isinstance(cls, c) for c in self._write_compilers]):
-                return original(cls, *args, **kwargs)
+                return _get_original(original, cls, *args, **kwargs)
             try:
                 sql, params = cls.as_sql()
                 if not sql:
@@ -349,7 +364,7 @@ class QueryCacheBackend(object):
                     query=(sql, params, cls.query.ordering_aliases),
                     key=key)
 
-            val = original(cls, *args, **kwargs)
+            val = _get_original(original, cls, *args, **kwargs)
 
             if hasattr(val, '__iter__'):
                 #Can't permanently cache lazy iterables without creating
@@ -372,7 +387,7 @@ class QueryCacheBackend(object):
             from django.db.models.sql import compiler
             # we have to do this before we check the tables, since the tables
             # are actually being set in the original function
-            ret = original(cls, *args, **kwargs)
+            ret = _get_original(original, cls, *args, **kwargs)
 
             if isinstance(cls, compiler.SQLInsertCompiler):
                 #Inserts are a special case where cls.tables
