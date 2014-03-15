@@ -767,10 +767,11 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         self.assertEqual(g.title, start_title)
 
     def test_savepoint_rollback_sqlite(self):
-        """SQLite savepoints don't work correctly with autocommit disabled,
+        """SQLite savepoints in Django 1.6 don't work correctly with autocommit disabled,
         so we have to use transaction.atomic().
-        See https://docs.djangoproject.com/en/dev/topics/db/transactions/#savepoints-in-sqlite"""
-        if connection.vendor != 'sqlite':
+        See https://docs.djangoproject.com/en/dev/topics/db/transactions/#savepoints-in-sqlite
+        SQLite doesn't seem to support savepoints in Django < 1.6"""
+        if not connection.features.uses_savepoints or connection.vendor != 'sqlite':
             return
         self.assertFalse(is_managed())
         self.assertFalse(transaction.is_dirty())
