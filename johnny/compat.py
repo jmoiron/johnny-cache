@@ -41,13 +41,14 @@ def empty_iter():
 def is_managed(using=None):
     if django.VERSION[:2] < (1, 6):
         return transaction.is_managed(using=using)
+    elif django.VERSION[:2] >= (1, 6):
+        # See https://code.djangoproject.com/ticket/21004
+        return not transaction.get_autocommit(using=using)
     return False
-    # Or maybe we should run the following line?  I'm not sure…
-    # return not transaction.get_autocommit(using=using)
 
 
 def managed(flag=True, using=None):
     if django.VERSION[:2] < (1, 6):
         transaction.managed(flag=flag, using=using)
-    # Maybe we should execute the following line otherwise?  I'm not sure…
-    # transaction.set_autocommit(autocommit=not flag, using=using)
+    elif django.VERSION[:2] >= (1, 6):
+        transaction.set_autocommit(not flag, using=using)

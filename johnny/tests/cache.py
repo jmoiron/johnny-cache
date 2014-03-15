@@ -8,7 +8,7 @@ from threading import Thread
 
 from django.conf import settings
 from django.core.paginator import Paginator
-from django.db import connection, connections, transaction
+from django.db import connection, connections, transaction, IntegrityError
 from django.db.models import Q, Count, Sum
 from johnny import middleware, settings as johnny_settings, cache
 from johnny.cache import get_tables_for_query, invalidate
@@ -630,7 +630,8 @@ class TransactionSupportTest(TransactionQueryCacheBase):
 
     def setUp(self):
         super(TransactionSupportTest, self).setUp()
-        managed(False)
+        if is_managed():
+            managed(False)
 
     def tearDown(self):
         if is_managed():
@@ -739,13 +740,12 @@ class TransactionSupportTest(TransactionQueryCacheBase):
 
     def test_savepoint_rollback(self):
         """Tests rollbacks of savepoints"""
-        if not connection.features.uses_savepoints:
+        if not connection.features.uses_savepoints or connection.vendor == 'sqlite':
             return
         self.assertFalse(is_managed())
         self.assertFalse(transaction.is_dirty())
         cache.local.clear()
         managed()
-        transaction.enter_transaction_management()
 
         g = Genre.objects.get(pk=1)
         start_title = g.title
@@ -762,6 +762,38 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         g = Genre.objects.get(pk=1)
         self.assertEqual(g.title, "Adventures in Savepoint World")
         transaction.rollback()
+        g = Genre.objects.get(pk=1)
+        self.assertEqual(g.title, start_title)
+
+    def test_savepoint_rollback_sqlite(self):
+        """SQLite savepoints don't work correctly with autocommit disabled,
+        so we have to use transaction.atomic().
+        See https://docs.djangoproject.com/en/dev/topics/db/transactions/#savepoints-in-sqlite"""
+        if connection.vendor != 'sqlite':
+            return
+        self.assertFalse(is_managed())
+        self.assertFalse(transaction.is_dirty())
+        cache.local.clear()
+
+        try:
+            with transaction.atomic():
+                g = Genre.objects.get(pk=1)
+                start_title = g.title
+                g.title = "Adventures in Savepoint World"
+                g.save()
+                g = Genre.objects.get(pk=1)
+                self.assertEqual(g.title, "Adventures in Savepoint World")
+                sid = transaction.savepoint()
+                g.title = "In the Void"
+                g.save()
+                g = Genre.objects.get(pk=1)
+                self.assertEqual(g.title, "In the Void")
+                transaction.savepoint_rollback(sid)
+                g = Genre.objects.get(pk=1)
+                self.assertEqual(g.title, "Adventures in Savepoint World")
+                raise IntegrityError('Exit transaction')
+        except IntegrityError:
+            pass
         g = Genre.objects.get(pk=1)
         self.assertEqual(g.title, start_title)
 
