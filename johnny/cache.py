@@ -440,8 +440,9 @@ class QueryCacheBackend(object):
     def invalidate(self, instance, **kwargs):
         if self._patched:
             table = resolve_table(instance)
+            using = kwargs.get('using', 'default')
             if not disallowed_table(table):
-                self.keyhandler.invalidate_table(table)
+                self.keyhandler.invalidate_table(table, db=using)
 
             tables = set()
             tables.add(table)
