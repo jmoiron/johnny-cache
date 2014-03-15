@@ -266,6 +266,7 @@ class MultiDbTest(TransactionQueryCacheBase):
         g1 = Genre.objects.using("default").get(pk=1)
         start_g1 = g1.title
         g2 = Genre.objects.using("second").get(pk=1)
+        start_g2 = g2.title
 
         transaction.enter_transaction_management(using='default')
         managed(using='default')
@@ -306,7 +307,7 @@ class MultiDbTest(TransactionQueryCacheBase):
         other("Genre.objects.using('second').get(pk=1)")
         hit, ostart = q.get()
         self.assertTrue(hit)
-        self.assertEqual(ostart.title, start_g1)
+        self.assertEqual(ostart.title, start_g2)
 
         with self.assertNumQueries(0, using='second'):
             g2 = Genre.objects.using("second").get(pk=1)
@@ -325,6 +326,7 @@ class MultiDbTest(TransactionQueryCacheBase):
         self.assertEqual(ostart.title, g2.title)
         self.assertTrue(hit)
 
+        transaction.commit(using="default")
         managed(False, 'default')
         transaction.leave_transaction_management("default")
         transaction.leave_transaction_management("second")
@@ -638,7 +640,6 @@ class TransactionSupportTest(TransactionQueryCacheBase):
             if transaction.is_dirty():
                 transaction.rollback()
             managed(False)
-            transaction.leave_transaction_management()
 
     def test_transaction_commit(self):
         """Test transaction support in Johnny."""
