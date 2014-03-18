@@ -11,9 +11,9 @@ http://code.djangoproject.com/ticket/7835#comment:21
 # the 'base' test class for johnny is locaded in base.py
 
 # import the other tests from johnny
-from localstore import LocalStoreTest
-from cache import *
-from web import *
+from .localstore import LocalStoreTest
+from .cache import *
+from .web import *
 
-from testapp.models import *
+from .testapp.models import *
 

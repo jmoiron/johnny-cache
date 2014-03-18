@@ -1,5 +1,7 @@
 # Django settings for proj project.
 
+import os
+import warnings
 import django
 
 DEBUG = True
@@ -9,20 +11,22 @@ ADMINS = ()
 
 MANAGERS = ADMINS
 
-if django.VERSION[:2] < (1, 3):
-    DATABASE_ENGINE = 'sqlite3'     # 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'oracle'.
-    DATABASE_NAME = 'johnny-db.db' # Or path to database file if using sqlite3.
-    DATABASE_USER = ''              # Not used with sqlite3.
-    DATABASE_PASSWORD = ''          # Not used with sqlite3.
-    DATABASE_HOST = ''              # Set to empty string for localhost. Not used with sqlite3.
-    DATABASE_PORT = ''              # Set to empty string for default. Not used with sqlite3.
-else:
-    DATABASES = {
-        'default' : {
-            'ENGINE' : 'django.db.backends.sqlite3',
-            'NAME' : 'johnny-db.db',
-        }
-    }
+db_engine = os.environ.get('DB_ENGINE', 'sqlite3')
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.' + db_engine,
+        'NAME': 'johnny_db',
+        'TEST_NAME': 'test_johnny_db',
+    },
+    'second': {
+        'ENGINE': 'django.db.backends.' + db_engine,
+        'NAME': 'johnny2_db',
+        'TEST_NAME': 'test_johnny2_db',
+    },
+}
+if db_engine == 'postgresql_psycopg2':
+    DATABASES['default']['OPTIONS'] = {'autocommit': True}
+    DATABASES['second']['OPTIONS'] = {'autocommit': True}
 
 # Local time zone for this installation. Choices can be found here:
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
@@ -55,38 +59,51 @@ MEDIA_URL = ''
 # Examples: "http://foo.com/media/", "/media/".
 ADMIN_MEDIA_PREFIX = '/media/'
 
-if django.VERSION[:2] < (1, 3):
-    #CACHE_BACKEND="johnny.backends.locmem://"
-    CACHE_BACKEND="johnny.backends.memcached://localhost:11211/"
-    #CACHE_BACKEND="johnny.backends.filebased:///tmp/johnny_cache.cc"
-else:
-    #CACHES = { 'default' : { 'BACKEND': 'johnny.backends.locmem.LocMemCache' }}
+cache_backend = os.environ.get('CACHE_BACKEND', 'memcached')
+if cache_backend == 'memcached':
     CACHES = {
-        'default' : {
-            'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
-            #'BACKEND': 'johnny.backends.memcached.MemcachedCache',
+        'default': {
+            'BACKEND': 'johnny.backends.memcached.MemcachedCache',
             'LOCATION': ['localhost:11211'],
             'JOHNNY_CACHE': True,
         }
     }
+elif cache_backend == 'redis':
+    CACHES = {
+        'default': {
+            'BACKEND': 'johnny.backends.redis.RedisCache',
+            'LOCATION': 'localhost:6379:0',
+            'JOHNNY_CACHE': True,
+        }
+    }
+elif cache_backend == 'locmem':
+    CACHES = {
+        'default': {
+            'BACKEND': 'johnny.backends.locmem.LocMemCache',
+        }
+    }
+    warnings.warn('Some tests may fail with the locmem cache backend!')
+elif cache_backend == 'filebased':
+    CACHES = {
+        'default': {
+            'BACKEND': 'johnny.backends.filebased.FileBasedCache',
+            'LOCATION': '_cache',
+        }
+    }
+    warnings.warn('Some tests may fail with the file-based cache backend!')
+else:
+    raise ValueError('The CACHE_BACKEND environment variable is invalid.')
 
 
 # Make this unique, and don't share it with anybody.
 SECRET_KEY = '_vpn1a^j(6&+3qip2me4f#&8#m#*#icc!%=x=)rha4k=!4m8s4'
 
 # List of callables that know how to import templates from various sources.
-if django.VERSION[:2] < (1, 3):
-    TEMPLATE_LOADERS = (
-        'django.template.loaders.filesystem.load_template_source',
-    #    'django.template.loaders.app_directories.load_template_source',
-    #    'django.template.loaders.eggs.load_template_source',
-    )
-else:
-    TEMPLATE_LOADERS = (
-        'django.template.loaders.filesystem.Loader',
-    #    'django.template.loaders.app_directories.Loader',
-    #    'django.template.loaders.eggs.Loader',
-    )
+TEMPLATE_LOADERS = (
+    'django.template.loaders.filesystem.Loader',
+#    'django.template.loaders.app_directories.Loader',
+#    'django.template.loaders.eggs.Loader',
+)
 
 MIDDLEWARE_CLASSES = (
     'django.middleware.common.CommonMiddleware',
@@ -118,3 +135,5 @@ except ImportError:
 lcls = locals()
 if 'DATABASES' in lcls and len(lcls['DATABASES']) > 1:
     DATABASE_ROUTERS = ['routers.MultiSyncedRouter']
+
+TEST_RUNNER = 'django.test.simple.DjangoTestSuiteRunner'

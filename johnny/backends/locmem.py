@@ -8,31 +8,19 @@ computer will last.  On a 64 bit machine, your cache will expire about
 """
 
 import sys
-
-import django
 from django.core.cache.backends import locmem
-from django.utils.encoding import smart_str
 
 
-class CacheClass(locmem.CacheClass):
+class LocMemCache(locmem.LocMemCache):
 
     def add(self, key, value, timeout=None, **kwargs):
         if timeout is 0:
-            timeout = sys.maxint
-        return super(CacheClass, self).add(
-            smart_str(key), value, timeout=timeout, **kwargs)
+            timeout = sys.maxsize
+        return super(LocMemCache, self).add(
+            key, value, timeout=timeout, **kwargs)
 
     def set(self, key, value, timeout=None, **kwargs):
         if timeout is 0:
-            timeout = sys.maxint
-        return super(CacheClass, self).set(
-            smart_str(key), value, timeout=timeout, **kwargs)
-
-if django.VERSION[:2] > (1, 2):
-
-    class LocMemCache(CacheClass):
-        """
-        Locmem cache interpreting 0 as "a very long time", named according
-        to the Django 1.3 conventions.
-        """
-        pass
+            timeout = sys.maxsize
+        return super(LocMemCache, self).set(
+            key, value, timeout=timeout, **kwargs)

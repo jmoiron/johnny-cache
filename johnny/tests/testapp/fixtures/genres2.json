@@ -1,0 +1,26 @@
+[
+  {
+    "model" : "testapp.genre",
+    "pk" : 1,
+    "fields" : {
+      "title" : "Architecture",
+      "slug" : "architecture"
+    }
+  },
+  {
+    "model" : "testapp.genre",
+    "pk" : 2,
+    "fields" : {
+      "title" : "Americana",
+      "slug" : "americana"
+    }
+  },
+  {
+    "model" : "testapp.genre",
+    "pk" : 3,
+    "fields" : {
+      "title" : "Historical",
+      "slug" : "historical"
+    }
+  }
+]

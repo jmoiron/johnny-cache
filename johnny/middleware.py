@@ -3,8 +3,6 @@
 
 """Middleware classes for johnny cache."""
 
-from django.middleware import transaction as trans_middleware
-from django.db import transaction
 from johnny import cache, settings
 
 
@@ -46,18 +44,3 @@ class LocalStoreClearMiddleware(object):
     def process_response(self, req, resp):
         cache.local.clear()
         return resp
-
-
-class CommittingTransactionMiddleware(trans_middleware.TransactionMiddleware):
-    """
-    A version of the built in TransactionMiddleware that always commits its
-    transactions, even if they aren't dirty.
-    """
-    def process_response(self, request, response):
-        if transaction.is_managed():
-            try:
-                transaction.commit()
-            except:
-                pass
-            transaction.leave_transaction_management()
-        return response

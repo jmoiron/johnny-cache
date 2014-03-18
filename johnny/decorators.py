@@ -1,7 +1,4 @@
-try:
-    from functools import wraps, WRAPPER_ASSIGNMENTS
-except ImportError:
-    from django.utils.functional import wraps, WRAPPER_ASSIGNMENTS
+from functools import wraps, WRAPPER_ASSIGNMENTS
 
 
 def available_attrs(fn):

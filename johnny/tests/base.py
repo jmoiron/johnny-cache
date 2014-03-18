@@ -3,16 +3,18 @@
 
 """Base test class for Johnny Cache Tests."""
 
-import sys
+from __future__ import print_function
+from pprint import pformat
 
-import django
 from django.test import TestCase, TransactionTestCase
 from django.conf import settings
 from django.core.management import call_command
 from django.db.models.loading import load_app
 
 from johnny import settings as johnny_settings
+from johnny.compat import Queue
 from johnny.decorators import wraps, available_attrs
+from johnny.signals import qc_hit, qc_miss, qc_skip
 
 # order matters here;  I guess we aren't deferring foreign key checking :\
 johnny_fixtures = ['authors.json', 'genres.json', 'publishers.json', 'books.json']
@@ -21,17 +23,15 @@ def show_johnny_signals(hit=None, miss=None):
     """A decorator that can be put on a test function that will show the
     johnny hit/miss signals by default, or do what is provided by the hit
     and miss keyword args."""
-    from pprint import pformat
     def _hit(*args, **kwargs):
-        print "hit:\n\t%s\n\t%s\n" % (pformat(args), pformat(kwargs))
+        print("hit:\n\t%s\n\t%s\n" % (pformat(args), pformat(kwargs)))
     def _miss(*args, **kwargs):
-        print "miss:\n\t%s\n\t%s\n" % (pformat(args), pformat(kwargs))
+        print("miss:\n\t%s\n\t%s\n" % (pformat(args), pformat(kwargs)))
     hit = hit or _hit
     miss = miss or _miss
     def deco(func):
         @wraps(func, assigned=available_attrs(func))
         def wrapped(*args, **kwargs):
-            from johnny.signals import qc_hit, qc_miss
             qc_hit.connect(hit)
             qc_miss.connect(miss)
             try:
@@ -83,26 +83,19 @@ class TransactionJohnnyTestCase(TransactionTestCase):
 
 class TransactionJohnnyWebTestCase(TransactionJohnnyTestCase):
     def _pre_setup(self):
-        from johnny import middleware
         self.saved_MIDDLEWARE_CLASSES = settings.MIDDLEWARE_CLASSES
-        if getattr(self.__class__, 'middleware', None):
-            settings.MIDDLEWARE_CLASSES = self.__class__.middleware
+        if getattr(self, 'middlewares', None):
+            settings.MIDDLEWARE_CLASSES = self.middlewares
         self.saved_DISABLE_SETTING = getattr(johnny_settings, 'DISABLE_QUERYSET_CACHE', False)
         johnny_settings.DISABLE_QUERYSET_CACHE = False
         self.saved_TEMPLATE_LOADERS = settings.TEMPLATE_LOADERS
-        if django.VERSION[:2] < (1, 3):
-            if 'django.template.loaders.app_directories.load_template_source' not in settings.TEMPLATE_LOADERS:
-                settings.TEMPLATE_LOADERS += ('django.template.loaders.app_directories.load_template_source',)
-        else:
-            if 'django.template.loaders.app_directories.Loader' not in settings.TEMPLATE_LOADERS:
-                settings.TEMPLATE_LOADERS += ('django.template.loaders.app_directories.Loader',)
-        self.middleware = middleware.QueryCacheMiddleware()
+        if 'django.template.loaders.app_directories.Loader' not in settings.TEMPLATE_LOADERS:
+            settings.TEMPLATE_LOADERS += ('django.template.loaders.app_directories.Loader',)
         self.saved_ROOT_URLCONF = settings.ROOT_URLCONF
         settings.ROOT_URLCONF = 'johnny.tests.testapp.urls'
         super(TransactionJohnnyWebTestCase, self)._pre_setup()
 
     def _post_teardown(self):
-        self.middleware.unpatch()
         johnny_settings.DISABLE_QUERYSET_CACHE = self.saved_DISABLE_SETTING
         settings.MIDDLEWARE_CLASSES = self.saved_MIDDLEWARE_CLASSES
         settings.ROOT_URLCONF = self.saved_ROOT_URLCONF
@@ -114,9 +107,7 @@ class message_queue(object):
     handlers use weakrefs, so if we don't save references to this object they
     will get gc'd pretty fast."""
     def __init__(self):
-        from johnny.signals import qc_hit, qc_miss, qc_skip
-        from Queue import Queue as queue
-        self.q = queue()
+        self.q = Queue()
         qc_hit.connect(self._hit)
         qc_miss.connect(self._miss)
         qc_skip.connect(self._skip)
@@ -136,12 +127,13 @@ class message_queue(object):
 def supports_transactions(con):
     """A convenience function which will work across multiple django versions
     that checks whether or not a connection supports transactions."""
-    features = con.features.__dict__
+    features = con.features
     vendor = con.vendor
-    if features.get("supports_transactions", False):
-        if vendor == "mysql" and not features.get('_storage_engine', '') == "InnoDB":
-            print "MySQL connection reports transactions supported but storage engine != InnoDB."
+    if features.supports_transactions:
+        if vendor == 'mysql' \
+                and getattr(features, '_mysql_storage_engine', '') != 'InnoDB':
+            print('MySQL connection reports transactions supported '
+                  'but storage engine != InnoDB.')
             return False
         return True
     return False
-

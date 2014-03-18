@@ -1,6 +1,5 @@
 from warnings import warn
 
-import django
 from django.conf import settings
 from django.core.cache import get_cache, cache
 
@@ -15,7 +14,7 @@ BLACKLIST = set(BLACKLIST)
 WHITELIST = set(getattr(settings, 'JOHNNY_TABLE_WHITELIST', []))
 
 DB_CACHE_KEYS = dict((name, db.get('JOHNNY_CACHE_KEY', name))
-                 for name, db in settings.DATABASES.iteritems())
+                 for name, db in settings.DATABASES.items())
 
 MIDDLEWARE_KEY_PREFIX = getattr(settings, 'JOHNNY_MIDDLEWARE_KEY_PREFIX', 'jc')
 

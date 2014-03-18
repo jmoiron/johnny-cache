@@ -3,6 +3,7 @@
 
 """Test models for Johnny-Cache"""
 
+from __future__ import unicode_literals
 import django
 from django.db import models
 from django.db.models import permalink
@@ -10,7 +11,7 @@ from django.conf import settings
 from django.utils.translation import ugettext_lazy as _
 
 def get_urlfield(*args, **kwargs):
-    if django.VERSION >= 1.4 and 'verify_exists' in kwargs:
+    if django.VERSION[:2] >= (1, 4) and 'verify_exists' in kwargs:
         del kwargs['verify_exists']
         return models.URLField(*args, **kwargs)
     return models.URLField(*args, **kwargs)
@@ -75,11 +76,11 @@ class Person(models.Model):
         ordering = ('last_name', 'first_name',)
 
     def __unicode__(self):
-        return u'%s' % self.full_name
+        return '%s' % self.full_name
 
     @property
     def full_name(self):
-        return u'%s %s' % (self.first_name, self.last_name)
+        return '%s %s' % (self.first_name, self.last_name)
 
     @permalink
     def get_absolute_url(self):
@@ -200,11 +201,11 @@ class Page(models.Model):
 class Milk(models.Model):
     """A meaningless model designed to test unicode ability.  This might screw
     up databases that can't handle unicode table/column names."""
-    name = models.CharField(blank=True, max_length=20, db_column=u'名前')
-    chocolate = models.BooleanField(blank=True, db_column=u'チョコレート')
+    name = models.CharField(blank=True, max_length=20, db_column='名前')
+    chocolate = models.BooleanField(blank=True, db_column='チョコレート')
 
     class Meta:
-        db_table = u'ミルク'
+        db_table = 'ミルク'
 
 
 

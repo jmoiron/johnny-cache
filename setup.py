@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import os
 from setuptools import setup
 #from distutils.core import setup
 
@@ -32,5 +31,3 @@ setup(name='johnny-cache',
       # setuptools specific
       zip_safe=False,
 )
-
-

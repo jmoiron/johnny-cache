@@ -3,9 +3,11 @@
 
 """URLconf for Johnny's test app."""
 
-from django.conf.urls.defaults import *
+try:
+    from django.conf.urls import patterns, url
+except ImportError:
+    from django.conf.urls.defaults import patterns, url
 
 urlpatterns = patterns('johnny.tests.testapp.views',
-   (r'^test/template_queries', 'template_queries'),
+   url(r'^test/template_queries', 'template_queries'),
 )
-
