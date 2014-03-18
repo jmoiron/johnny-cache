@@ -1,8 +1,8 @@
-.. image:: https://travis-ci.org/BertrandBordage/johnny-cache.png
-  :target: https://travis-ci.org/BertrandBordage/johnny-cache
+.. image:: https://travis-ci.org/jmoiron/johnny-cache.png
+  :target: https://travis-ci.org/jmoiron/johnny-cache
 
-.. image:: https://coveralls.io/repos/BertrandBordage/johnny-cache/badge.png
-  :target: https://coveralls.io/r/BertrandBordage/johnny-cache
+.. image:: https://coveralls.io/repos/jmoiron/johnny-cache/badge.png
+  :target: https://coveralls.io/r/jmoiron/johnny-cache
 
 
 Johnny Cache is a caching framework for django_ applications.  It works with
