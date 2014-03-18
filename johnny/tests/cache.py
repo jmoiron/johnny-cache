@@ -8,7 +8,7 @@ from threading import Thread
 
 from django.conf import settings
 from django.core.paginator import Paginator
-from django.db import connection, connections, transaction
+from django.db import connection, connections, transaction, IntegrityError
 from django.db.models import Q, Count, Sum
 from johnny import middleware, settings as johnny_settings, cache
 from johnny.cache import get_tables_for_query, invalidate
@@ -266,6 +266,7 @@ class MultiDbTest(TransactionQueryCacheBase):
         g1 = Genre.objects.using("default").get(pk=1)
         start_g1 = g1.title
         g2 = Genre.objects.using("second").get(pk=1)
+        start_g2 = g2.title
 
         transaction.enter_transaction_management(using='default')
         managed(using='default')
@@ -306,7 +307,7 @@ class MultiDbTest(TransactionQueryCacheBase):
         other("Genre.objects.using('second').get(pk=1)")
         hit, ostart = q.get()
         self.assertTrue(hit)
-        self.assertEqual(ostart.title, start_g1)
+        self.assertEqual(ostart.title, start_g2)
 
         with self.assertNumQueries(0, using='second'):
             g2 = Genre.objects.using("second").get(pk=1)
@@ -325,6 +326,7 @@ class MultiDbTest(TransactionQueryCacheBase):
         self.assertEqual(ostart.title, g2.title)
         self.assertTrue(hit)
 
+        transaction.commit(using="default")
         managed(False, 'default')
         transaction.leave_transaction_management("default")
         transaction.leave_transaction_management("second")
@@ -630,14 +632,14 @@ class TransactionSupportTest(TransactionQueryCacheBase):
 
     def setUp(self):
         super(TransactionSupportTest, self).setUp()
-        managed(False)
+        if is_managed():
+            managed(False)
 
     def tearDown(self):
         if is_managed():
             if transaction.is_dirty():
                 transaction.rollback()
             managed(False)
-            transaction.leave_transaction_management()
 
     def test_transaction_commit(self):
         """Test transaction support in Johnny."""
@@ -739,13 +741,12 @@ class TransactionSupportTest(TransactionQueryCacheBase):
 
     def test_savepoint_rollback(self):
         """Tests rollbacks of savepoints"""
-        if not connection.features.uses_savepoints:
+        if not connection.features.uses_savepoints or connection.vendor == 'sqlite':
             return
         self.assertFalse(is_managed())
         self.assertFalse(transaction.is_dirty())
         cache.local.clear()
         managed()
-        transaction.enter_transaction_management()
 
         g = Genre.objects.get(pk=1)
         start_title = g.title
@@ -762,6 +763,39 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         g = Genre.objects.get(pk=1)
         self.assertEqual(g.title, "Adventures in Savepoint World")
         transaction.rollback()
+        g = Genre.objects.get(pk=1)
+        self.assertEqual(g.title, start_title)
+
+    def test_savepoint_rollback_sqlite(self):
+        """SQLite savepoints in Django 1.6 don't work correctly with autocommit disabled,
+        so we have to use transaction.atomic().
+        See https://docs.djangoproject.com/en/dev/topics/db/transactions/#savepoints-in-sqlite
+        SQLite doesn't seem to support savepoints in Django < 1.6"""
+        if not connection.features.uses_savepoints or connection.vendor != 'sqlite':
+            return
+        self.assertFalse(is_managed())
+        self.assertFalse(transaction.is_dirty())
+        cache.local.clear()
+
+        try:
+            with transaction.atomic():
+                g = Genre.objects.get(pk=1)
+                start_title = g.title
+                g.title = "Adventures in Savepoint World"
+                g.save()
+                g = Genre.objects.get(pk=1)
+                self.assertEqual(g.title, "Adventures in Savepoint World")
+                sid = transaction.savepoint()
+                g.title = "In the Void"
+                g.save()
+                g = Genre.objects.get(pk=1)
+                self.assertEqual(g.title, "In the Void")
+                transaction.savepoint_rollback(sid)
+                g = Genre.objects.get(pk=1)
+                self.assertEqual(g.title, "Adventures in Savepoint World")
+                raise IntegrityError('Exit transaction')
+        except IntegrityError:
+            pass
         g = Genre.objects.get(pk=1)
         self.assertEqual(g.title, start_title)
 
