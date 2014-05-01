@@ -11,15 +11,15 @@ ADMINS = ()
 
 MANAGERS = ADMINS
 
-db_engine = os.environ.get('DB_ENGINE', 'sqlite3')
+db_engine = os.environ.get('DB_ENGINE', 'django.db.backends.sqlite3')
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.' + db_engine,
+        'ENGINE': db_engine,
         'NAME': 'johnny_db',
         'TEST_NAME': 'test_johnny_db',
     },
     'second': {
-        'ENGINE': 'django.db.backends.' + db_engine,
+        'ENGINE': db_engine,
         'NAME': 'johnny2_db',
         'TEST_NAME': 'test_johnny2_db',
     },
