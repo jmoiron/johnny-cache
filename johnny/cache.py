@@ -373,8 +373,9 @@ class QueryCacheBackend(object):
                 #no longer lazy...
                 #todo - create a smart iterable wrapper
                 val = list(val)
-            #if COUNT cache is disabled and this is a COUNT, don't check the cache.
-            if key is not None and not (settings.DISABLE_COUNT_CACHE and self.is_count(sql)):
+            #if COUNT cache is disabled, this is a query with `COUNT` in it, and `val` is a number,
+            #don't touch the cache.
+            if key is not None and not (settings.DISABLE_COUNT_CACHE and self.is_count(sql)) and not (val and type(val) == list and type(val[0]) in (long, int)):
                 if not val:
                     self.cache_backend.set(key, no_result_sentinel, settings.MIDDLEWARE_SECONDS, db)
                 else:
