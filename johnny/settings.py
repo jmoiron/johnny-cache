@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.cache import get_cache, cache
 
 DISABLE_QUERYSET_CACHE = getattr(settings, 'DISABLE_QUERYSET_CACHE', False)
+DISABLE_COUNT_CACHE = getattr(settings, 'JOHNNY_DISABLE_COUNT_CACHE', False)
 
 DEFAULT_BLACKLIST = ['south_migrationhistory']
 

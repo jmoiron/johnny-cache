@@ -299,6 +299,11 @@ class QueryCacheBackend(object):
                                             self.kg_class, self.prefix)
         self._patched = getattr(self, '_patched', False)
 
+    def is_count(self, sql):
+        if "COUNT" in sql:
+            return True
+        return False
+
     def _monkey_select(self, original):
         from django.db.models.sql.constants import MULTI
         from django.db.models.sql.datastructures import EmptyResultSet
@@ -368,7 +373,8 @@ class QueryCacheBackend(object):
                 #no longer lazy...
                 #todo - create a smart iterable wrapper
                 val = list(val)
-            if key is not None:
+            #if COUNT cache is disabled and this is a COUNT, don't check the cache.
+            if key is not None and not (settings.DISABLE_COUNT_CACHE and self.is_count(sql)):
                 if not val:
                     self.cache_backend.set(key, no_result_sentinel, settings.MIDDLEWARE_SECONDS, db)
                 else:
