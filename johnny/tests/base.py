@@ -10,7 +10,6 @@ from django.test import TestCase, TransactionTestCase
 from django.conf import settings
 from django.core.management import call_command
 from django.db.models.loading import load_app
-from django.utils import six
 
 from johnny import settings as johnny_settings
 from johnny.compat import Queue
@@ -133,7 +132,7 @@ def supports_transactions(con):
     if features.supports_transactions:
         if vendor == 'mysql':
             engine = getattr(features, '_mysql_storage_engine', '')
-            if not isinstance(engine, six.string_types):
+            if callable(engine):
                 # Oracle's mysql.connector.django backend uses a method call
                 # instead of a property.
                 engine = engine()
