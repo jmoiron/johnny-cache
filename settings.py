@@ -11,22 +11,33 @@ ADMINS = ()
 
 MANAGERS = ADMINS
 
-db_engine = os.environ.get('DB_ENGINE', 'sqlite3')
+db_engine = os.environ.get('DB_ENGINE', 'django.db.backends.sqlite3')
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.' + db_engine,
+        'ENGINE': db_engine,
         'NAME': 'johnny_db',
         'TEST_NAME': 'test_johnny_db',
+        'OPTIONS': {},
     },
     'second': {
-        'ENGINE': 'django.db.backends.' + db_engine,
+        'ENGINE': db_engine,
         'NAME': 'johnny2_db',
         'TEST_NAME': 'test_johnny2_db',
+        'OPTIONS': {},
     },
 }
-if db_engine == 'postgresql_psycopg2':
+if db_engine == 'django.db.backends.postgresql_psycopg2':
     DATABASES['default']['OPTIONS'] = {'autocommit': True}
     DATABASES['second']['OPTIONS'] = {'autocommit': True}
+if db_engine in ('django.db.backends.mysql', 'mysql.connector.django'):
+    DATABASES['default']['USER'] = 'root'
+    DATABASES['second']['USER'] = 'root'
+if db_engine == 'mysql.connector.django':
+    # Disable raising exception on database warnings (turned on by default
+    # when settings.DEBUG is True), otherwise causes test failures when trying
+    # to test for transaction support via use of a DROP TABLE IF EXISTS query.
+    DATABASES['default']['OPTIONS']['raise_on_warnings'] = False
+    DATABASES['second']['OPTIONS']['raise_on_warnings'] = False
 
 # Local time zone for this installation. Choices can be found here:
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name

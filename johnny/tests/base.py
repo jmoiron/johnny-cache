@@ -130,10 +130,15 @@ def supports_transactions(con):
     features = con.features
     vendor = con.vendor
     if features.supports_transactions:
-        if vendor == 'mysql' \
-                and getattr(features, '_mysql_storage_engine', '') != 'InnoDB':
-            print('MySQL connection reports transactions supported '
-                  'but storage engine != InnoDB.')
-            return False
+        if vendor == 'mysql':
+            engine = getattr(features, '_mysql_storage_engine', '')
+            if callable(engine):
+                # Oracle's mysql.connector.django backend uses a method call
+                # instead of a property.
+                engine = engine()
+            if engine != 'InnoDB':
+                print('MySQL connection reports transactions supported '
+                      'but storage engine != InnoDB.')
+                return False
         return True
     return False
