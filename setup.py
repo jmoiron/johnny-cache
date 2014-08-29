@@ -4,7 +4,7 @@
 from setuptools import setup
 #from distutils.core import setup
 
-version = '1.6a'
+version = '1.6.1a'
 
 setup(name='johnny-cache',
       version=version,
