@@ -84,7 +84,7 @@ def get_tables_for_query(query):
     """
     from django.db.models.sql.where import WhereNode, SubqueryConstraint
     from django.db.models.query import QuerySet
-    tables = [v[0] for v in getattr(query,'alias_map',{}).values()]
+    tables = set([v[0] for v in getattr(query,'alias_map',{}).values()])
 
     def get_sub_query_tables(node):
         query = node.query_object
@@ -93,27 +93,27 @@ def get_tables_for_query(query):
         else:
             query = query._clone()
         query = query.query
-        return [v[0] for v in getattr(query, 'alias_map',{}).values()]
+        return set(v[0] for v in getattr(query, 'alias_map',{}).values())
 
     def get_tables(node, tables):
         if isinstance(node, SubqueryConstraint):
             return get_sub_query_tables(node)
         for child in node.children:
             if isinstance(child, WhereNode):  # and child.children:
-                tables = get_tables(child, tables)
+                tables |= set(get_tables(child, tables))
             elif not hasattr(child, '__iter__'):
                 continue
             else:
                 for item in (c for c in child if isinstance(c, QuerySet)):
-                    tables += get_tables_for_query(item.query)
+                    tables |= get_tables_for_query(item.query)
         return tables
 
     if query.where and query.where.children:
         where_nodes = [c for c in query.where.children if isinstance(c, (WhereNode, SubqueryConstraint))]
         for node in where_nodes:
-            tables += get_tables(node, tables)
+            tables |= get_tables(node, tables)
 
-    return list(set(tables))
+    return list(tables)
 
 def get_tables_for_query_pre_16(query):
     """
