@@ -1,12 +1,12 @@
 """Johnny's main caching functionality."""
 
 from hashlib import md5
+import sys
 from types import MethodType
 from uuid import uuid4
 
 import django
 from django.db.models.signals import post_save, post_delete
-from django.utils import six
 
 from . import localstore, signals
 from . import settings
@@ -270,11 +270,11 @@ def _get_original(original, instance, *args, **kwargs):
     """
     Return the value from the call to the original method.
     """
-    if original.im_class == instance.__class__:
+    if original.__module__ == instance.__class__.__module__:
         return original(instance, *args, **kwargs)
     else:  # allow compiler proxies as well
-        if six.PY3:
-            return MethodType(original.__func__, instance)(*args, **kwargs)
+        if sys.version_info[0] == 3:
+            return MethodType(original, instance)(*args, **kwargs)
         else:
             return MethodType(original.__func__, instance, instance.__class__)(*args, **kwargs)
 
