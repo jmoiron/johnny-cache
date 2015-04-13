@@ -3,27 +3,34 @@
 
 """Tests for the QueryCache functionality of johnny."""
 
-import django
-from django.conf import settings
-from django.db import connection
-try:
-    from django.db import connections
-except:
-    connections = None
-from johnny import middleware
-from johnny import settings as johnny_settings
-import base
+from __future__ import print_function
+from threading import Thread
 
-try:
-    any
-except NameError:
-    def any(iterable):
-        for i in iterable:
-            if i: return True
-        return False
+from django.conf import settings
+from django.core.paginator import Paginator
+from django.db import connection, connections, transaction, IntegrityError
+from django.db.models import Q, Count, Sum
+from johnny import middleware, settings as johnny_settings, cache
+from johnny.cache import get_tables_for_query, invalidate
+from johnny.compat import is_managed, managed, Queue
+from johnny.signals import qc_hit, qc_miss, qc_skip
+from . import base
+from .testapp.models import (
+    Genre, Book, Publisher, Person, PersonType, Issue24Model as i24m)
+
 
 # put tests in here to be included in the testing suite
 __all__ = ['MultiDbTest', 'SingleModelTest', 'MultiModelTest', 'TransactionSupportTest', 'BlackListTest', 'TransactionManagerTestCase']
+
+
+def is_multithreading_safe(db_using=None):
+    # SQLite is not thread-safe.
+    if db_using is None:
+        return all(is_multithreading_safe(db_using=db_name)
+                   for db_name in settings.DATABASES)
+    db_engine = settings.DATABASES.get(db_using, {}).get('ENGINE', 'sqlite3')
+    return not db_engine.endswith('sqlite3')
+
 
 def _pre_setup(self):
     self.saved_DISABLE_SETTING = getattr(johnny_settings, 'DISABLE_QUERYSET_CACHE', False)
@@ -49,44 +56,39 @@ class TransactionQueryCacheBase(base.TransactionJohnnyTestCase):
         super(TransactionQueryCacheBase, self)._pre_setup()
 
     def _post_teardown(self):
-        from django.db import transaction
         _post_teardown(self)
         super(TransactionQueryCacheBase, self)._post_teardown()
-        if transaction.is_managed():
-            transaction.managed(False)
+        if transaction.is_dirty():
+            transaction.rollback()
+        if is_managed():
+            managed(False)
 
 class BlackListTest(QueryCacheBase):
     fixtures = base.johnny_fixtures
 
     def test_basic_blacklist(self):
-        from johnny import cache, settings
-        from testapp.models import Genre, Book
         q = base.message_queue()
         old = johnny_settings.BLACKLIST
         johnny_settings.BLACKLIST = set(['testapp_genre'])
-        connection.queries = []
         Book.objects.get(id=1)
         Book.objects.get(id=1)
-        self.failUnless((False, True) == (q.get_nowait(), q.get_nowait()))
+        self.assertFalse(q.get_nowait())
+        self.assertTrue(q.get_nowait())
         list(Genre.objects.all())
         list(Genre.objects.all())
-        self.failUnless(not any((q.get_nowait(), q.get_nowait())))
+        self.assertFalse(q.get_nowait())
+        self.assertFalse(q.get_nowait())
         johnny_settings.BLACKLIST = old
 
 
 class MultiDbTest(TransactionQueryCacheBase):
     multi_db = True
-    fixtures = ['genres.json', 'genres.second.json']
+    fixtures = ['genres.json', 'genres2.json']
 
-    def _run_threaded(self, query, queue):
+    def _run_threaded(self, query, queue, data):
         """Runs a query (as a string) from testapp in another thread and
         puts (hit?, result) on the provided queue."""
-        from threading import Thread
         def _inner(_query):
-            from testapp.models import Genre, Book, Publisher, Person
-            from johnny.signals import qc_hit, qc_miss, qc_skip
-            from johnny.cache import local
-            from django.db import transaction
             msg = []
             def hit(*args, **kwargs):
                 msg.append(True)
@@ -97,32 +99,21 @@ class MultiDbTest(TransactionQueryCacheBase):
             qc_hit.connect(hit)
             qc_miss.connect(miss)
             qc_skip.connect(skip)
-            obj = eval(_query)
+            obj = eval(_query, data)
             msg.append(obj)
             queue.put(msg)
         t = Thread(target=_inner, args=(query,))
         t.start()
         t.join()
 
-    def _other(self, cmd, q):
-        def _innter(cmd):
-            q.put(eval(cmd))
-        t = Thread(target=_inner, args=(cmd,))
-        t.start()
-        t.join()
-
     def test_basic_queries(self):
         """Tests basic queries and that the cache is working for multiple db's"""
         if len(getattr(settings, "DATABASES", [])) <= 1:
-            print "\n  Skipping multi database tests"
+            print("\n  Skipping multi database tests")
             return
 
-        from pprint import pformat
-        from testapp.models import Genre, Book, Publisher, Person
-        from django.db import connections
-
-        self.failUnless("default" in getattr(settings, "DATABASES"))
-        self.failUnless("second" in getattr(settings, "DATABASES"))
+        self.assertTrue("default" in getattr(settings, "DATABASES"))
+        self.assertTrue("second" in getattr(settings, "DATABASES"))
 
         g1 = Genre.objects.using("default").get(pk=1)
         g1.title = "A default database"
@@ -130,32 +121,27 @@ class MultiDbTest(TransactionQueryCacheBase):
         g2 = Genre.objects.using("second").get(pk=1)
         g2.title = "A second database"
         g2.save(using='second')
-        for c in connections:
-            connections[c].queries = []
         #fresh from cache since we saved each
-        g1 = Genre.objects.using('default').get(pk=1)
-        g2 = Genre.objects.using('second').get(pk=1)
-        for c in connections:
-            self.failUnless(len(connections[c].queries) == 1)
-        self.failUnless(g1.title == "A default database")
-        self.failUnless(g2.title == "A second database")
+        with self.assertNumQueries(1, using='default'):
+            g1 = Genre.objects.using('default').get(pk=1)
+        with self.assertNumQueries(1, using='second'):
+            g2 = Genre.objects.using('second').get(pk=1)
+        self.assertEqual(g1.title, "A default database")
+        self.assertEqual(g2.title, "A second database")
         #should be a cache hit
-        g1 = Genre.objects.using('default').get(pk=1)
-        g2 = Genre.objects.using('second').get(pk=1)
-        for c in connections:
-            self.failUnless(len(connections[c].queries) == 1)
+        with self.assertNumQueries(0, using='default'):
+            g1 = Genre.objects.using('default').get(pk=1)
+        with self.assertNumQueries(0, using='second'):
+            g2 = Genre.objects.using('second').get(pk=1)
 
     def test_cache_key_setting(self):
         """Tests that two databases use a single cached object when given the same DB cache key"""
         if len(getattr(settings, "DATABASES", [])) <= 1:
-            print "\n  Skipping multi database tests"
+            print("\n  Skipping multi database tests")
             return
 
-        from testapp.models import Genre
-        from django.db import connections
-
-        self.failUnless("default" in getattr(settings, "DATABASES"))
-        self.failUnless("second" in getattr(settings, "DATABASES"))
+        self.assertTrue("default" in getattr(settings, "DATABASES"))
+        self.assertTrue("second" in getattr(settings, "DATABASES"))
 
         old_cache_keys = johnny_settings.DB_CACHE_KEYS
         johnny_settings.DB_CACHE_KEYS = {'default': 'default', 'second': 'default'}
@@ -166,53 +152,39 @@ class MultiDbTest(TransactionQueryCacheBase):
         g2 = Genre.objects.using("second").get(pk=1)
         g2.title = "A second database"
         g2.save(using='second')
-        for c in connections:
-            connections[c].queries = []
         #fresh from cache since we saved each
-        g1 = Genre.objects.using('default').get(pk=1)
-        g2 = Genre.objects.using('second').get(pk=1)
+        with self.assertNumQueries(1, using='default'):
+            g1 = Genre.objects.using('default').get(pk=1)
+        with self.assertNumQueries(0, using='second'):
+            g2 = Genre.objects.using('second').get(pk=1)
         johnny_settings.DB_CACHE_KEYS = old_cache_keys
-        total_queries = sum([len(connections[c].queries)
-                             for c in connections])
-        self.assertEqual(total_queries, 1)
 
     def test_transactions(self):
         """Tests transaction rollbacks and local cache for multiple dbs"""
 
         if len(getattr(settings, "DATABASES", [])) <= 1:
-            print "\n  Skipping multi database tests"
+            print("\n  Skipping multi database tests")
             return
-        if hasattr(settings, 'DATABASE_ENGINE'):
-            if settings.DATABASE_ENGINE == 'sqlite3':
-                print "\n  Skipping test requiring multiple threads."
+
+        if not is_multithreading_safe():
+            print("\n  Skipping test requiring multiple threads.")
+            return
+
+        for conname in connections:
+            con = connections[conname]
+            if not base.supports_transactions(con):
+                print("\n  Skipping test requiring transactions.")
                 return
-        else:
-            from django.db import connections, transaction
-            for db in settings.DATABASES.values():
-                if db['ENGINE'] == 'sqlite3':
-                    print "\n  Skipping test requiring multiple threads."
-                    return
 
-            for conname in connections:
-                con = connections[conname]
-                if not base.supports_transactions(con):
-                    print "\n  Skipping test requiring transactions."
-                    return
-
-        from django.db import connections, transaction
-        from johnny import cache as c
-        from Queue import Queue as queue
-        q = queue()
-        other = lambda x: self._run_threaded(x, q)
-
-        from testapp.models import Genre
+        q = Queue()
+        other = lambda x: self._run_threaded(x, q, {'Genre': Genre})
 
 
         # sanity check 
-        self.failUnless(transaction.is_managed() == False)
-        self.failUnless(transaction.is_dirty() == False)
-        self.failUnless("default" in getattr(settings, "DATABASES"))
-        self.failUnless("second" in getattr(settings, "DATABASES"))
+        self.assertFalse(is_managed())
+        self.assertFalse(transaction.is_dirty())
+        self.assertTrue("default" in getattr(settings, "DATABASES"))
+        self.assertTrue("second" in getattr(settings, "DATABASES"))
 
         # this should seed this fetch in the global cache
         g1 = Genre.objects.using("default").get(pk=1)
@@ -220,9 +192,9 @@ class MultiDbTest(TransactionQueryCacheBase):
         start_g1 = g1.title
 
         transaction.enter_transaction_management(using='default')
-        transaction.managed(using='default')
+        managed(using='default')
         transaction.enter_transaction_management(using='second')
-        transaction.managed(using='second')
+        managed(using='second')
 
         g1.title = "Testing a rollback"
         g2.title = "Testing a commit"
@@ -233,81 +205,73 @@ class MultiDbTest(TransactionQueryCacheBase):
         # not contain the local changes
         other("Genre.objects.using('default').get(pk=1)")
         hit, ostart = q.get()
-        self.failUnless(ostart.title == start_g1)
-        self.failUnless(hit)
+        self.assertEqual(ostart.title, start_g1)
+        self.assertTrue(hit)
 
         transaction.rollback(using='default')
         transaction.commit(using='second')
-        transaction.managed(False, "default")
-        transaction.managed(False, "second")
+        managed(False, using='default')
+        managed(False, using='second')
 
         #other thread should have seen rollback
         other("Genre.objects.using('default').get(pk=1)")
         hit, ostart = q.get()
-        self.failUnless(ostart.title == start_g1)
-        self.failUnless(hit)
+        self.assertEqual(ostart.title, start_g1)
+        self.assertTrue(hit)
 
-        connections['default'].queries = []
-        connections['second'].queries = []
         #should be a cache hit due to rollback
-        g1 = Genre.objects.using("default").get(pk=1)
+        with self.assertNumQueries(0, using='default'):
+            g1 = Genre.objects.using("default").get(pk=1)
         #should be a db hit due to commit
-        g2 = Genre.objects.using("second").get(pk=1)
-        self.failUnless(connections['default'].queries == [])
-        self.failUnless(len(connections['second'].queries) == 1)
+        with self.assertNumQueries(1, using='second'):
+            g2 = Genre.objects.using("second").get(pk=1)
 
         #other thread sould now be accessing the cache after the get
         #from the commit.
         other("Genre.objects.using('second').get(pk=1)")
         hit, ostart = q.get()
-        self.failUnless(ostart.title == g2.title)
-        self.failUnless(hit)
+        self.assertEqual(ostart.title, g2.title)
+        self.assertTrue(hit)
 
-        self.failUnless(g1.title == start_g1)
-        self.failUnless(g2.title == "Testing a commit")
+        self.assertEqual(g1.title, start_g1)
+        self.assertEqual(g2.title, "Testing a commit")
         transaction.leave_transaction_management("default")
         transaction.leave_transaction_management("second")
 
     def test_savepoints(self):
         """tests savepoints for multiple db's"""
-        from Queue import Queue as queue
-        q = queue()
-        other = lambda x: self._run_threaded(x, q)
-
-        from testapp.models import Genre
-        try:
-            from django.db import connections, transaction
-        except ImportError:
-            # connections doesn't exist in 1.1 and under
-            print"\n  Skipping multi database tests"
+        q = Queue()
+        other = lambda x: self._run_threaded(x, q, {'Genre': Genre})
 
         if len(getattr(settings, "DATABASES", [])) <= 1:
-            print "\n  Skipping multi database tests"
+            print("\n  Skipping multi database tests")
             return
+
+        if not is_multithreading_safe():
+            print("\n  Skipping test requiring multiple threads.")
+            return
+
         for name, db in settings.DATABASES.items():
-            if name in ('default', 'second'):
-                if 'sqlite' in db['ENGINE']:
-                    print "\n  Skipping test requiring multiple threads."
-                    return
-                con = connections[name]
-                if not con.features.uses_savepoints:
-                    print "\n  Skipping test requiring savepoints."
-                    return
+            con = connections[name]
+            if not con.features.uses_savepoints:
+                print("\n  Skipping test requiring savepoints.")
+                return
 
         # sanity check 
-        self.failUnless(transaction.is_managed() == False)
-        self.failUnless(transaction.is_dirty() == False)
-        self.failUnless("default" in getattr(settings, "DATABASES"))
-        self.failUnless("second" in getattr(settings, "DATABASES"))
+        self.assertFalse(is_managed())
+        self.assertFalse(transaction.is_dirty())
+        self.assertTrue("default" in getattr(settings, "DATABASES"))
+        self.assertTrue("second" in getattr(settings, "DATABASES"))
 
         g1 = Genre.objects.using("default").get(pk=1)
         start_g1 = g1.title
         g2 = Genre.objects.using("second").get(pk=1)
+        start_g2 = g2.title
 
         transaction.enter_transaction_management(using='default')
-        transaction.managed(using='default')
+        managed(using='default')
         transaction.enter_transaction_management(using='second')
-        transaction.managed(using='second')
+        managed(using='second')
 
         g1.title = "Rollback savepoint"
         g1.save()
@@ -324,47 +288,46 @@ class MultiDbTest(TransactionQueryCacheBase):
         #not the local cache version
         other("Genre.objects.using('default').get(pk=1)")
         hit, ostart = q.get()
-        self.failUnless(hit)
-        self.failUnless(ostart.title == start_g1)
+        self.assertTrue(hit)
+        self.assertEqual(ostart.title, start_g1)
         #should not be a hit due to rollback
-        connections["default"].queries = []
         transaction.savepoint_rollback(sid, using="default")
         g1 = Genre.objects.using("default").get(pk=1)
 
         # i think it should be "Rollback Savepoint" here
-        self.failUnless(g1.title == start_g1)
+        self.assertEqual(g1.title, start_g1)
 
         #will be pushed to dirty in commit
         g2 = Genre.objects.using("second").get(pk=1)
-        self.failUnless(g2.title == "Committed savepoint")
+        self.assertEqual(g2.title, "Committed savepoint")
         transaction.savepoint_commit(sid2, using="second")
 
         #other thread should still see original version even 
         #after savepoint commit
         other("Genre.objects.using('second').get(pk=1)")
         hit, ostart = q.get()
-        self.failUnless(hit)
-        self.failUnless(ostart.title == start_g1)
+        self.assertTrue(hit)
+        self.assertEqual(ostart.title, start_g2)
 
-        connections["second"].queries = []
-        g2 = Genre.objects.using("second").get(pk=1)
-        self.failUnless(connections["second"].queries == [])
+        with self.assertNumQueries(0, using='second'):
+            g2 = Genre.objects.using("second").get(pk=1)
 
         transaction.commit(using="second")
-        transaction.managed(False, "second")
+        managed(False, using='second')
 
-        g2 = Genre.objects.using("second").get(pk=1)
-        self.failUnless(connections["second"].queries == [])
-        self.failUnless(g2.title == "Committed savepoint")
+        with self.assertNumQueries(0, using='second'):
+            g2 = Genre.objects.using("second").get(pk=1)
+        self.assertEqual(g2.title, "Committed savepoint")
 
         #now committed and cached, other thread should reflect new title
         #without a hit to the db
         other("Genre.objects.using('second').get(pk=1)")
         hit, ostart = q.get()
-        self.failUnless(ostart.title == g2.title)
-        self.failUnless(hit)
+        self.assertEqual(ostart.title, g2.title)
+        self.assertTrue(hit)
 
-        transaction.managed(False, "default")
+        transaction.commit(using="default")
+        managed(False, 'default')
         transaction.leave_transaction_management("default")
         transaction.leave_transaction_management("second")
 
@@ -376,8 +339,6 @@ class SingleModelTest(QueryCacheBase):
         """A test to detect the issue described in bitbucket #24:
         https://bitbucket.org/jmoiron/johnny-cache/issue/24/
         """
-        from testapp.models import Issue24Model as i24m
-
         i24m.objects.get_or_create(one=1, two=1)
         i24m.objects.get_or_create(one=1, two=2)
         i24m.objects.get_or_create(one=2, two=1)
@@ -394,34 +355,27 @@ class SingleModelTest(QueryCacheBase):
 
     def test_exists_hit(self):
         """Tests that an exist failure caches properly"""
-        from testapp.models import Publisher
-        connection.queries = []
-
-        Publisher.objects.filter(title="Doesn't Exist").exists()
-        Publisher.objects.filter(title="Doesn't Exist").exists()
-
-        self.assertEqual(len(connection.queries), 1)
+        with self.assertNumQueries(1):
+            Publisher.objects.filter(title="Doesn't Exist").exists()
+            Publisher.objects.filter(title="Doesn't Exist").exists()
 
     def test_basic_querycaching(self):
         """A basic test that querycaching is functioning properly and is
         being invalidated properly on singular table reads & writes."""
-        from testapp.models import Publisher, Genre
-        from django.db.models import Q
-        connection.queries = []
-        starting_count = Publisher.objects.count()
-        starting_count = Publisher.objects.count()
-        # make sure that doing this twice doesn't hit the db twice
-        self.failUnless(len(connection.queries) == 1)
-        self.failUnless(starting_count == 1)
+
+        with self.assertNumQueries(1):
+            starting_count = Publisher.objects.count()
+            starting_count = Publisher.objects.count()
+        self.assertEqual(starting_count, 1)
+
         # this write should invalidate the key we have
         Publisher(title='Harper Collins', slug='harper-collins').save()
-        connection.queries = []
-        new_count = Publisher.objects.count()
-        self.failUnless(len(connection.queries) == 1)
-        self.failUnless(new_count == 2)
+        with self.assertNumQueries(1):
+            new_count = Publisher.objects.count()
+        self.assertEqual(new_count, 2)
         # this tests the codepath after 'except EmptyResultSet' where
         # result_type == MULTI
-        self.failUnless(not list(Publisher.objects.filter(title__in=[])))
+        self.assertFalse(list(Publisher.objects.filter(title__in=[])))
         # test for a regression on the WhereNode, bitbucket #20
         g1 = Genre.objects.get(pk=1)
         g1.title = "Survival Horror"
@@ -431,27 +385,23 @@ class SingleModelTest(QueryCacheBase):
     def test_querycache_return_results(self):
         """Test that the return results from the query cache are what we
         expect;  single items are single items, etc."""
-        from testapp.models import Publisher
-        connection.queries = []
-        pub = Publisher.objects.get(id=1)
-        pub2 = Publisher.objects.get(id=1)
-        self.failUnless(pub == pub2)
-        self.failUnless(len(connection.queries) == 1)
-        pubs = list(Publisher.objects.all())
-        pubs2 = list(Publisher.objects.all())
-        self.failUnless(pubs == pubs2)
-        self.failUnless(len(connection.queries) == 2)
+        with self.assertNumQueries(1):
+            pub = Publisher.objects.get(id=1)
+            pub2 = Publisher.objects.get(id=1)
+        self.assertEqual(pub, pub2)
+        with self.assertNumQueries(1):
+            pubs = list(Publisher.objects.all())
+            pubs2 = list(Publisher.objects.all())
+        self.assertEqual(pubs, pubs2)
 
     def test_delete(self):
         """Test that a database delete clears a table cache."""
-        from testapp.models import Genre
         g1 = Genre.objects.get(pk=1)
         begin = Genre.objects.all().count()
         g1.delete()
         self.assertRaises(Genre.DoesNotExist, lambda: Genre.objects.get(pk=1))
-        connection.queries = []
-        self.failUnless(Genre.objects.all().count() == (begin -1))
-        self.failUnless(len(connection.queries) == 1)
+        with self.assertNumQueries(1):
+            self.assertEqual(Genre.objects.all().count(), begin - 1)
         Genre(title='Science Fiction', slug='scifi').save()
         Genre(title='Fantasy', slug='rubbish').save()
         Genre(title='Science Fact', slug='scifact').save()
@@ -461,33 +411,26 @@ class SingleModelTest(QueryCacheBase):
         Genre.objects.filter(title__startswith='Science').delete()
         # this should not be cached
         Genre.objects.get(title='Fantasy')
-        self.failUnless(not q.get_nowait())
+        self.assertFalse(q.get_nowait())
 
     def test_update(self):
-        from testapp.models import Genre
-        connection.queries = []
-        g1 = Genre.objects.get(pk=1)
-        Genre.objects.all().update(title="foo")
-        g2 = Genre.objects.get(pk=1)
-        self.failUnless(g1.title != g2.title)
-        self.failUnless(g2.title == "foo")
-        self.failUnless(len(connection.queries) == 3)
+        with self.assertNumQueries(3):
+            g1 = Genre.objects.get(pk=1)
+            Genre.objects.all().update(title="foo")
+            g2 = Genre.objects.get(pk=1)
+        self.assertNotEqual(g1.title, g2.title)
+        self.assertEqual(g2.title, "foo")
 
     def test_empty_count(self):
         """Test for an empty count aggregate query with an IN"""
-        from testapp.models import Genre
         books = Genre.objects.filter(id__in=[])
         count = books.count()
-        self.failUnless(count == 0)
+        self.assertEqual(count, 0)
 
     def test_aggregate_annotation(self):
         """Test aggregating an annotation """
-        from django.db.models import Count
-        from django.db.models import Sum
-        from testapp.models import Book
-        from django.core.paginator import Paginator
         author_count = Book.objects.annotate(author_count=Count('authors')).aggregate(Sum('author_count'))
-        self.assertEquals(author_count['author_count__sum'],2)
+        self.assertEqual(author_count['author_count__sum'], 2)
         # also test using the paginator, although this shouldn't be a big issue..
         books = Book.objects.all().annotate(num_authors=Count('authors'))
         paginator = Paginator(books, 25)
@@ -496,32 +439,24 @@ class SingleModelTest(QueryCacheBase):
     def test_queryset_laziness(self):
         """This test exists to model the laziness of our queries;  the
         QuerySet cache should not alter the laziness of QuerySets."""
-        from testapp.models import Genre
-        connection.queries = []
-        qs = Genre.objects.filter(title__startswith='A')
-        qs = qs.filter(pk__lte=1)
-        qs = qs.order_by('pk')
-        # we should only execute the query at this point
-        arch = qs[0]
-        self.failUnless(len(connection.queries) == 1)
+        with self.assertNumQueries(1):
+            qs = Genre.objects.filter(title__startswith='A')
+            qs = qs.filter(pk__lte=1)
+            qs = qs.order_by('pk')
+            # we should only execute the query at this point
+            arch = qs[0]
 
     def test_order_by(self):
         """A basic test that our query caching is taking order clauses
         into account."""
-        from testapp.models import Genre
-        connection.queries = []
-        first = list(Genre.objects.filter(title__startswith='A').order_by('slug'))
-        second = list(Genre.objects.filter(title__startswith='A').order_by('-slug'))
-        # test that we've indeed done two queries and that the orders
-        # of the results are reversed
-        self.failUnless((first[0], first[1] == second[1], second[0]))
-        self.failUnless(len(connection.queries) == 2)
+        with self.assertNumQueries(2):
+            first = list(Genre.objects.filter(title__startswith='A').order_by('slug'))
+            second = list(Genre.objects.filter(title__startswith='A').order_by('-slug'))
+        # test that the orders of the results are reversed
+        self.assertEqual((first[0], first[1]), (second[1], second[0]))
 
     def test_signals(self):
         """Test that the signals we say we're sending are being sent."""
-        from testapp.models import Genre
-        from johnny.signals import qc_hit, qc_miss, qc_skip
-        connection.queries = []
         misses = []
         hits = []
         def qc_hit_listener(sender, **kwargs):
@@ -533,11 +468,10 @@ class SingleModelTest(QueryCacheBase):
         qc_skip.connect(qc_miss_listener)
         first = list(Genre.objects.filter(title__startswith='A').order_by('slug'))
         second = list(Genre.objects.filter(title__startswith='A').order_by('slug'))
-        self.failUnless(len(misses) == len(hits) == 1)
+        self.assertEqual(len(misses), 1)
+        self.assertEqual(len(hits), 1)
 
     def test_in_values_list(self):
-        from testapp.models import Publisher, Book
-        from johnny.cache import get_tables_for_query
         pubs = Publisher.objects.all()
         books = Book.objects.filter(publisher__in=pubs.values_list("id", flat=True))
         tables = list(sorted(get_tables_for_query(books.query)))
@@ -551,131 +485,116 @@ class MultiModelTest(QueryCacheBase):
         """Test that simple joining (and deferred loading) functions as we'd
         expect when involving multiple tables.  In particular, a query that
         joins 2 tables should invalidate when either table is invalidated."""
-        from testapp.models import Genre, Book, Publisher, Person
-        connection.queries = []
-        books = list(Book.objects.select_related('publisher'))
-        books = list(Book.objects.select_related('publisher'))
-        str(books[0].genre)
-        # this should all have done one query..
-        self.failUnless(len(connection.queries) == 1)
+        with self.assertNumQueries(1):
+            books = list(Book.objects.select_related('publisher'))
+            books = list(Book.objects.select_related('publisher'))
+            str(books[0].genre)
         books = list(Book.objects.select_related('publisher'))
         # invalidate the genre key, which shouldn't impact the query
         Genre(title='Science Fiction', slug='scifi').save()
-        after_save = len(connection.queries)
-        books = list(Book.objects.select_related('publisher'))
-        self.failUnless(len(connection.queries) == after_save)
+        with self.assertNumQueries(0):
+            books = list(Book.objects.select_related('publisher'))
         # now invalidate publisher, which _should_
         p = Publisher(title='McGraw Hill', slug='mcgraw-hill')
         p.save()
-        after_save = len(connection.queries)
-        books = list(Book.objects.select_related('publisher'))
-        self.failUnless(len(connection.queries) == after_save + 1)
+        with self.assertNumQueries(1):
+            books = list(Book.objects.select_related('publisher'))
         # the query should be cached again...
         books = list(Book.objects.select_related('publisher'))
         # this time, create a book and the query should again be uncached..
         Book(title='Anna Karenina', slug='anna-karenina', publisher=p).save()
-        after_save = len(connection.queries)
-        books = list(Book.objects.select_related('publisher'))
-        self.failUnless(len(connection.queries) == after_save + 1)
+        with self.assertNumQueries(1):
+            books = list(Book.objects.select_related('publisher'))
 
     def test_invalidate(self):
         """Test for the module-level invalidation function."""
-        from Queue import Queue as queue
-        from testapp.models import Book, Genre, Publisher
-        from johnny.cache import invalidate
         q = base.message_queue()
         b = Book.objects.get(id=1)
         invalidate(Book)
         b = Book.objects.get(id=1)
         first, second = q.get_nowait(), q.get_nowait()
-        self.failUnless(first == second == False)
+        self.assertFalse(first)
+        self.assertFalse(second)
         g = Genre.objects.get(id=1)
         p = Publisher.objects.get(id=1)
         invalidate('testapp_genre', Publisher)
         g = Genre.objects.get(id=1)
         p = Publisher.objects.get(id=1)
         fg,fp,sg,sp = [q.get() for i in range(4)]
-        self.failUnless(fg == fp == sg == sp == False)
+        self.assertFalse(fg)
+        self.assertFalse(fp)
+        self.assertFalse(sg)
+        self.assertFalse(sp)
 
     def test_many_to_many(self):
-        from testapp.models import Book, Person
         b = Book.objects.get(pk=1)
         p1 = Person.objects.get(pk=1)
         p2 = Person.objects.get(pk=2)
         b.authors.add(p1)
-        connection.queries = []
-
-        list(b.authors.all())
 
         #many to many should be invalidated
-        self.failUnless(len(connection.queries) == 1)
+        with self.assertNumQueries(1):
+            list(b.authors.all())
+
         b.authors.remove(p1)
         b = Book.objects.get(pk=1)
         list(b.authors.all())
         #can't determine the queries here, 1.1 and 1.2 uses them differently
 
-        connection.queries = []
         #many to many should be invalidated, 
         #person is not invalidated since we just want
         #the many to many table to be
-        p1 = Person.objects.get(pk=1)
-        self.failUnless(len(connection.queries) == 0)
+        with self.assertNumQueries(0):
+            p1 = Person.objects.get(pk=1)
 
         p1.books.add(b)
-        connection.queries = []
 
         #many to many should be invalidated,
         #this is the first query
-        list(p1.books.all())
-        b = Book.objects.get(pk=1)
-        self.failUnless(len(connection.queries) == 1)
+        with self.assertNumQueries(1):
+            list(p1.books.all())
+            b = Book.objects.get(pk=1)
 
         #query should be cached
-        self.failUnless(len(list(p1.books.all())) == 1)
-        self.failUnless(len(connection.queries) == 1)
+        with self.assertNumQueries(0):
+            self.assertEqual(len(list(p1.books.all())), 1)
 
         #testing clear
         b.authors.clear()
-        self.failUnless(b.authors.all().count() == 0)
-        self.failUnless(p1.books.all().count() == 0)
+        self.assertEqual(b.authors.all().count(), 0)
+        self.assertEqual(p1.books.all().count(), 0)
         b.authors.add(p1)
-        self.failUnless(b.authors.all().count() == 1)
-        queries = len(connection.queries)
+        self.assertEqual(b.authors.all().count(), 1)
 
-        #should be cached
-        b.authors.all().count()
-        self.failUnless(len(connection.queries) == queries)
-        self.failUnless(p1.books.all().count() == 1)
+        with self.assertNumQueries(0):
+            b.authors.all().count()
+        self.assertEqual(p1.books.all().count(), 1)
         p1.books.clear()
-        self.failUnless(b.authors.all().count() == 0)
+        self.assertEqual(b.authors.all().count(), 0)
 
     def test_subselect_support(self):
         """Test that subselects are handled properly."""
-        from django import db
-        db.reset_queries()
-        from testapp.models import Book, Person, PersonType
-        author_types = PersonType.objects.filter(title='Author')
-        author_people = Person.objects.filter(person_types__in=author_types)
-        written_books = Book.objects.filter(authors__in=author_people)
+        with self.assertNumQueries(0):
+            author_types = PersonType.objects.filter(title='Author')
+            author_people = Person.objects.filter(person_types__in=author_types)
+            written_books = Book.objects.filter(authors__in=author_people)
         q = base.message_queue()
-        self.failUnless(len(db.connection.queries) == 0)
         count = written_books.count()
-        self.failUnless(q.get() == False)
+        self.assertFalse(q.get())
         # execute the query again, this time it's cached
-        self.failUnless(written_books.count() == count)
-        self.failUnless(q.get() == True)
+        self.assertEqual(written_books.count(), count)
+        self.assertTrue(q.get())
         # change the person type of 'Author' to something else
         pt = PersonType.objects.get(title='Author')
         pt.title = 'NonAuthor'
         pt.save()
-        self.failUnless(PersonType.objects.filter(title='Author').count() == 0)
+        self.assertEqual(PersonType.objects.filter(title='Author').count(), 0)
         q.clear()
-        db.reset_queries()
         # now execute the same query;  the result should be diff and it should be
         # a cache miss
         new_count = written_books.count()
-        self.failUnless(new_count != count)
-        self.failUnless(q.get() == False)
+        self.assertNotEqual(new_count, count)
+        self.assertFalse(q.get())
         PersonType.objects.filter(title='NonAuthor').order_by('-title')[:5]
 
     def test_foreign_key_delete_cascade(self):
@@ -690,10 +609,7 @@ class TransactionSupportTest(TransactionQueryCacheBase):
     def _run_threaded(self, query, queue):
         """Runs a query (as a string) from testapp in another thread and
         puts (hit?, result) on the provided queue."""
-        from threading import Thread
         def _inner(_query):
-            from testapp.models import Genre, Book, Publisher, Person
-            from johnny.signals import qc_hit, qc_miss, qc_skip
             msg = []
             def hit(*args, **kwargs):
                 msg.append(True)
@@ -714,66 +630,57 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         t.start()
         t.join()
 
+    def setUp(self):
+        super(TransactionSupportTest, self).setUp()
+        if is_managed():
+            managed(False)
+
     def tearDown(self):
-        from django.db import transaction
-        if transaction.is_managed():
+        if is_managed():
             if transaction.is_dirty():
                 transaction.rollback()
-            transaction.managed(False)
-            transaction.leave_transaction_management()
+            managed(False)
 
     def test_transaction_commit(self):
         """Test transaction support in Johnny."""
-        from Queue import Queue as queue
-        from django.db import transaction
-        from testapp.models import Genre, Publisher
-        from johnny import cache
+        if not is_multithreading_safe(db_using='default'):
+            print("\n  Skipping test requiring multiple threads.")
+            return
 
-        if django.VERSION[:2] < (1, 3):
-            if settings.DATABASE_ENGINE == 'sqlite3':
-                print "\n  Skipping test requiring multiple threads."
-                return
-        else:
-            if settings.DATABASES.get('default', {}).get('ENGINE', '').endswith('sqlite3'):
-                print "\n  Skipping test requiring multiple threads."
-                return
-
-
-        self.failUnless(transaction.is_managed() == False)
-        self.failUnless(transaction.is_dirty() == False)
-        connection.queries = []
+        self.assertFalse(is_managed())
+        self.assertFalse(transaction.is_dirty())
         cache.local.clear()
-        q = queue()
+        q = Queue()
         other = lambda x: self._run_threaded(x, q)
         # load some data
         start = Genre.objects.get(id=1)
         other('Genre.objects.get(id=1)')
         hit, ostart = q.get()
         # these should be the same and should have hit cache
-        self.failUnless(hit)
-        self.failUnless(ostart == start)
+        self.assertTrue(hit)
+        self.assertEqual(ostart, start)
         # enter manual transaction management
         transaction.enter_transaction_management()
-        transaction.managed()
+        managed()
         start.title = 'Jackie Chan Novels'
         # local invalidation, this key should hit the localstore!
         nowlen = len(cache.local)
         start.save()
-        self.failUnless(nowlen != len(cache.local))
+        self.assertNotEqual(nowlen, len(cache.local))
         # perform a read OUTSIDE this transaction... it should still see the
         # old gen key, and should still find the "old" data
         other('Genre.objects.get(id=1)')
         hit, ostart = q.get()
-        self.failUnless(hit)
-        self.failUnless(ostart.title != start.title)
+        self.assertTrue(hit)
+        self.assertNotEqual(ostart.title, start.title)
         transaction.commit()
         # now that we commit, we push the localstore keys out;  this should be
         # a cache miss, because we never read it inside the previous transaction
         other('Genre.objects.get(id=1)')
         hit, ostart = q.get()
-        self.failUnless(not hit)
-        self.failUnless(ostart.title == start.title)
-        transaction.managed(False)
+        self.assertFalse(hit)
+        self.assertEqual(ostart.title, start.title)
+        managed(False)
         transaction.leave_transaction_management()
 
     def test_transaction_rollback(self):
@@ -781,25 +688,14 @@ class TransactionSupportTest(TransactionQueryCacheBase):
 
         Similar to the commit, this sets up a write to a db in a transaction,
         reads from it (to force a cache write of sometime), then rolls back."""
+        if not is_multithreading_safe(db_using='default'):
+            print("\n  Skipping test requiring multiple threads.")
+            return
 
-        from Queue import Queue as queue
-        from django.db import transaction
-        from testapp.models import Genre, Publisher
-        from johnny import cache
-        if django.VERSION[:2] < (1, 3):
-            if settings.DATABASE_ENGINE == 'sqlite3':
-                print "\n  Skipping test requiring multiple threads."
-                return
-        else:
-            if settings.DATABASES.get('default', {}).get('ENGINE', '').endswith('sqlite3'):
-                print "\n  Skipping test requiring multiple threads."
-                return
-
-        self.failUnless(transaction.is_managed() == False)
-        self.failUnless(transaction.is_dirty() == False)
-        connection.queries = []
+        self.assertFalse(is_managed())
+        self.assertFalse(transaction.is_dirty())
         cache.local.clear()
-        q = queue()
+        q = Queue()
         other = lambda x: self._run_threaded(x, q)
 
         # load some data
@@ -807,140 +703,155 @@ class TransactionSupportTest(TransactionQueryCacheBase):
         other('Genre.objects.get(id=1)')
         hit, ostart = q.get()
         # these should be the same and should have hit cache
-        self.failUnless(hit)
-        self.failUnless(ostart == start)
+        self.assertTrue(hit)
+        self.assertEqual(ostart, start)
         # enter manual transaction management
         transaction.enter_transaction_management()
-        transaction.managed()
+        managed()
         start.title = 'Jackie Chan Novels'
         # local invalidation, this key should hit the localstore!
         nowlen = len(cache.local)
         start.save()
-        self.failUnless(nowlen != len(cache.local))
+        self.assertNotEqual(nowlen, len(cache.local))
         # perform a read OUTSIDE this transaction... it should still see the
         # old gen key, and should still find the "old" data
         other('Genre.objects.get(id=1)')
         hit, ostart = q.get()
-        self.failUnless(hit)
-        self.failUnless(ostart.title != start.title)
+        self.assertTrue(hit)
+        self.assertNotEqual(ostart.title, start.title)
         # perform a READ inside the transaction;  this should hit the localstore
         # but not the outside!
         nowlen = len(cache.local)
         start2 = Genre.objects.get(id=1)
-        self.failUnless(start2.title == start.title)
-        self.failUnless(len(cache.local) > nowlen)
+        self.assertEqual(start2.title, start.title)
+        self.assertTrue(len(cache.local) > nowlen)
         transaction.rollback()
         # we rollback, and flush all johnny keys related to this transaction
         # subsequent gets should STILL hit the cache in the other thread
         # and indeed, in this thread.
 
-        self.failUnless(transaction.is_dirty() == False)
+        self.assertFalse(transaction.is_dirty())
         other('Genre.objects.get(id=1)')
         hit, ostart = q.get()
-        self.failUnless(hit)
+        self.assertTrue(hit)
         start = Genre.objects.get(id=1)
-        self.failUnless(ostart.title == start.title)
-        transaction.managed(False)
+        self.assertEqual(ostart.title, start.title)
+        managed(False)
         transaction.leave_transaction_management()
 
     def test_savepoint_rollback(self):
         """Tests rollbacks of savepoints"""
-        from django.db import transaction
-        from testapp.models import Genre, Publisher
-        from johnny import cache
-        if not connection.features.uses_savepoints:
+        if not connection.features.uses_savepoints or connection.vendor == 'sqlite':
             return
-        self.failUnless(transaction.is_managed() == False)
-        self.failUnless(transaction.is_dirty() == False)
-        connection.queries = []
+        self.assertFalse(is_managed())
+        self.assertFalse(transaction.is_dirty())
         cache.local.clear()
-        transaction.enter_transaction_management()
-        transaction.managed()
+        managed()
+
         g = Genre.objects.get(pk=1)
         start_title = g.title
         g.title = "Adventures in Savepoint World"
         g.save()
         g = Genre.objects.get(pk=1)
-        self.failUnless(g.title == "Adventures in Savepoint World")
+        self.assertEqual(g.title, "Adventures in Savepoint World")
         sid = transaction.savepoint()
         g.title = "In the Void"
         g.save()
         g = Genre.objects.get(pk=1)
-        self.failUnless(g.title == "In the Void")
+        self.assertEqual(g.title, "In the Void")
         transaction.savepoint_rollback(sid)
         g = Genre.objects.get(pk=1)
-        self.failUnless(g.title == "Adventures in Savepoint World")
+        self.assertEqual(g.title, "Adventures in Savepoint World")
         transaction.rollback()
         g = Genre.objects.get(pk=1)
-        self.failUnless(g.title == start_title)
-        transaction.managed(False)
-        transaction.leave_transaction_management()
+        self.assertEqual(g.title, start_title)
+
+    def test_savepoint_rollback_sqlite(self):
+        """SQLite savepoints in Django 1.6 don't work correctly with autocommit disabled,
+        so we have to use transaction.atomic().
+        See https://docs.djangoproject.com/en/dev/topics/db/transactions/#savepoints-in-sqlite
+        SQLite doesn't seem to support savepoints in Django < 1.6"""
+        if not connection.features.uses_savepoints or connection.vendor != 'sqlite':
+            return
+        self.assertFalse(is_managed())
+        self.assertFalse(transaction.is_dirty())
+        cache.local.clear()
+
+        try:
+            with transaction.atomic():
+                g = Genre.objects.get(pk=1)
+                start_title = g.title
+                g.title = "Adventures in Savepoint World"
+                g.save()
+                g = Genre.objects.get(pk=1)
+                self.assertEqual(g.title, "Adventures in Savepoint World")
+                sid = transaction.savepoint()
+                g.title = "In the Void"
+                g.save()
+                g = Genre.objects.get(pk=1)
+                self.assertEqual(g.title, "In the Void")
+                transaction.savepoint_rollback(sid)
+                g = Genre.objects.get(pk=1)
+                self.assertEqual(g.title, "Adventures in Savepoint World")
+                raise IntegrityError('Exit transaction')
+        except IntegrityError:
+            pass
+        g = Genre.objects.get(pk=1)
+        self.assertEqual(g.title, start_title)
 
     def test_savepoint_commit(self):
         """Tests a transaction commit (release)
         The release actually pushes the savepoint back into the dirty stack,
         but at the point it was saved in the transaction"""
-        from django.db import transaction
-        from testapp.models import Genre, Publisher
-        from johnny import cache
         if not connection.features.uses_savepoints:
             return
-        self.failUnless(transaction.is_managed() == False)
-        self.failUnless(transaction.is_dirty() == False)
-        connection.queries = []
+        self.assertFalse(is_managed())
+        self.assertFalse(transaction.is_dirty())
         cache.local.clear()
         transaction.enter_transaction_management()
-        transaction.managed()
+        managed()
         g = Genre.objects.get(pk=1)
         start_title = g.title
         g.title = "Adventures in Savepoint World"
         g.save()
         g = Genre.objects.get(pk=1)
-        self.failUnless(g.title == "Adventures in Savepoint World")
+        self.assertEqual(g.title, "Adventures in Savepoint World")
         sid = transaction.savepoint()
         g.title = "In the Void"
         g.save()
-        connection.queries = []
         #should be a database hit because of save in savepoint
-        g = Genre.objects.get(pk=1)
-        self.failUnless(len(connection.queries) == 1)
-        self.failUnless(g.title == "In the Void")
+        with self.assertNumQueries(1):
+            g = Genre.objects.get(pk=1)
+        self.assertEqual(g.title, "In the Void")
         transaction.savepoint_commit(sid)
         #should be a cache hit against the dirty store
-        connection.queries = []
-        g = Genre.objects.get(pk=1)
-        self.failUnless(connection.queries == [])
-        self.failUnless(g.title == "In the Void")
+        with self.assertNumQueries(0):
+            g = Genre.objects.get(pk=1)
+        self.assertEqual(g.title, "In the Void")
         transaction.commit()
         #should have been pushed up to cache store
-        g = Genre.objects.get(pk=1)
-        self.failUnless(connection.queries == [])
-        self.failUnless(g.title == "In the Void")
-        transaction.managed(False)
+        with self.assertNumQueries(0):
+            g = Genre.objects.get(pk=1)
+        self.assertEqual(g.title, "In the Void")
+        managed(False)
         transaction.leave_transaction_management()
 
-import johnny
-class TransactionManagerTestCase(base.TransactionJohnnyTestCase):
 
-    def setUp(self):
-        self.middleware = middleware.QueryCacheMiddleware()
-    
+class TransactionManagerTestCase(base.TransactionJohnnyTestCase):
     def tearDown(self):
-        from django.db import transaction
-        if transaction.is_managed():
-            transaction.managed(False)
+        if is_managed():
+            managed(False)
 
     def test_savepoint_localstore_flush(self):
         """
         This is a very simple test to see if savepoints will actually
         be committed, i.e. flushed out from localstore into cache.
         """
-        from django.db import transaction
         transaction.enter_transaction_management()
-        transaction.managed()
+        managed()
 
         TABLE_NAME = 'test_table'
-        cache_backend = johnny.cache.get_backend()
+        cache_backend = cache.get_backend()
         cache_backend.patch()
         keyhandler = cache_backend.keyhandler
         keygen = keyhandler.keygen
@@ -960,4 +871,4 @@ class TransactionManagerTestCase(base.TransactionJohnnyTestCase):
         # top-level dictionary of our localstore
         tm._commit_all_savepoints()
         # And this checks if it actually happened.
-        self.failUnless(table_key in tm.local)
+        self.assertTrue(table_key in tm.local)

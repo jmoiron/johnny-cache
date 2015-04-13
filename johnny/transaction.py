@@ -1,11 +1,7 @@
-import django
-from django.db import transaction as django_transaction
-from django.db import connection
-try:
-    from django.db import DEFAULT_DB_ALIAS
-except:
-    DEFUALT_DB_ALIAS = None
+from django.db import transaction, connection, DEFAULT_DB_ALIAS
 
+from johnny import settings as johnny_settings
+from johnny.compat import is_managed
 from johnny.decorators import wraps, available_attrs
 
 
@@ -53,9 +49,7 @@ class TransactionManager(object):
             del self.local['trans_sids']
 
     def is_managed(self, using=None):
-        if django.VERSION[1] < 2:
-            return django_transaction.is_managed()
-        return django_transaction.is_managed(using=using)
+        return is_managed(using=using)
 
     def get(self, key, default=None, using=None):
         if self.is_managed(using) and self._patched_var:
@@ -79,6 +73,7 @@ class TransactionManager(object):
     def _trunc_using(self, using):
         if using is None:
             using = DEFAULT_DB_ALIAS
+        using = johnny_settings.DB_CACHE_KEYS[using]
         if len(using) > 100:
             using = using[0:68] + self.keygen.gen_key(using[68:])
         return using
@@ -111,7 +106,7 @@ class TransactionManager(object):
                 self._commit_all_savepoints(using)
             c = self.local.mget('%s_%s_*' %
                                 (self.prefix, self._trunc_using(using)))
-            for key, value in c.iteritems():
+            for key, value in c.items():
                 self.cache_backend.set(key, value, self.timeout)
         else:
             if self._uses_savepoints():
@@ -122,7 +117,6 @@ class TransactionManager(object):
     def _patched(self, original, commit=True, unless_managed=False):
         @wraps(original, assigned=available_attrs(original))
         def newfun(using=None):
-            #1.2 version
             original(using=using)
             # copying behavior of original func
             # if it is an 'unless_managed' version we should do nothing if transaction is managed
@@ -153,13 +147,14 @@ class TransactionManager(object):
         #store them to a dictionary in the localstore
         if key not in self.local:
             self.local[key] = {}
-        for k, v in c.iteritems():
+        for k, v in c.items():
             self.local[key][k] = v
         #clear the dirty
         self._clear(using)
         #append the key to the savepoint stack
         sids = self._get_sid(using)
-        sids.append(key)
+        if key not in sids:
+            sids.append(key)
 
     def _rollback_savepoint(self, sid, using=None):
         sids = self._get_sid(using)
@@ -193,7 +188,7 @@ class TransactionManager(object):
                 stack.insert(0, popped)
             self._store_dirty(using)
             for i in stack:
-                for k, v in self.local.get(i, {}).iteritems():
+                for k, v in self.local.get(i, {}).items():
                     self.local[k] = v
                 del self.local[i]
             self._restore_dirty(using)
@@ -216,20 +211,20 @@ class TransactionManager(object):
                             (self.prefix, self._trunc_using(using)))
         backup = 'trans_dirty_store_%s' % self._trunc_using(using)
         self.local[backup] = {}
-        for k, v in c.iteritems():
+        for k, v in c.items():
             self.local[backup][k] = v
         self._clear(using)
 
     def _restore_dirty(self, using=None):
         backup = 'trans_dirty_store_%s' % self._trunc_using(using)
-        for k, v in self.local.get(backup, {}).iteritems():
+        for k, v in self.local.get(backup, {}).items():
             self.local[k] = v
         del self.local[backup]
 
     def _savepoint(self, original):
         @wraps(original, assigned=available_attrs(original))
         def newfun(using=None):
-            if using != None:
+            if using is not None:
                 sid = original(using=using)
             else:
                 sid = original()
@@ -261,8 +256,8 @@ class TransactionManager(object):
         return newfun
 
     def _getreal(self, name):
-        return getattr(django_transaction, 'real_%s' % name,
-                getattr(django_transaction, name))
+        return getattr(transaction, 'real_%s' % name,
+                getattr(transaction, name))
 
     def patch(self):
         """
@@ -278,19 +273,19 @@ class TransactionManager(object):
             self._originals['savepoint'] = self._getreal('savepoint')
             self._originals['savepoint_rollback'] = self._getreal('savepoint_rollback')
             self._originals['savepoint_commit'] = self._getreal('savepoint_commit')
-            django_transaction.rollback = self._patched(django_transaction.rollback, False)
-            django_transaction.rollback_unless_managed = self._patched(django_transaction.rollback_unless_managed,
+            transaction.rollback = self._patched(transaction.rollback, False)
+            transaction.rollback_unless_managed = self._patched(transaction.rollback_unless_managed,
                                                                        False, unless_managed=True)
-            django_transaction.commit = self._patched(django_transaction.commit, True)
-            django_transaction.commit_unless_managed = self._patched(django_transaction.commit_unless_managed,
+            transaction.commit = self._patched(transaction.commit, True)
+            transaction.commit_unless_managed = self._patched(transaction.commit_unless_managed,
                                                                      True, unless_managed=True)
-            django_transaction.savepoint = self._savepoint(django_transaction.savepoint)
-            django_transaction.savepoint_rollback = self._savepoint_rollback(django_transaction.savepoint_rollback)
-            django_transaction.savepoint_commit = self._savepoint_commit(django_transaction.savepoint_commit)
+            transaction.savepoint = self._savepoint(transaction.savepoint)
+            transaction.savepoint_rollback = self._savepoint_rollback(transaction.savepoint_rollback)
+            transaction.savepoint_commit = self._savepoint_commit(transaction.savepoint_commit)
 
             self._patched_var = True
 
     def unpatch(self):
         for fun in self._originals:
-            setattr(django_transaction, fun, self._originals[fun])
+            setattr(transaction, fun, self._originals[fun])
         self._patched_var = False

@@ -1,36 +1,20 @@
 """Johnny's main caching functionality."""
 
-import re
-import time
+from hashlib import md5
 from types import MethodType
 from uuid import uuid4
 
-try:
-    from hashlib import md5
-except ImportError:
-    from md5 import md5
-
-import localstore
-import signals
-from johnny import settings
-from johnny.decorators import wraps, available_attrs
-from transaction import TransactionManager
-
 import django
-from django.core.exceptions import ImproperlyConfigured
 from django.db.models.signals import post_save, post_delete
-from django.db.models.sql import compiler
 from django.utils import six
 
-try:
-    any
-except NameError:
+from . import localstore, signals
+from . import settings
+from .compat import (
+    force_bytes, force_text, string_types, text_type, empty_iter)
+from .decorators import wraps, available_attrs
+from .transaction import TransactionManager
 
-    def any(iterable):
-        for i in iterable:
-            if i:
-                return True
-        return False
 
 class NotInCache(object):
     #This is used rather than None to properly cache empty querysets
@@ -38,13 +22,6 @@ class NotInCache(object):
 
 no_result_sentinel = "22c52d96-156a-4638-a38d-aae0051ee9df"
 local = localstore.LocalStore()
-
-def empty_iter():
-    #making this a function as the empty_iter has changed between 1.4 and 1.5
-    if django.VERSION[:2] >= (1, 5):
-        return iter([])
-    else:
-        return compiler.empty_iter()
 
 
 def disallowed_table(*tables):
@@ -84,7 +61,7 @@ patch,unpatch = enable,disable
 
 def resolve_table(x):
     """Return a table name for x, where x is either a model instance or a string."""
-    if isinstance(x, basestring):
+    if isinstance(x, string_types):
         return x
     return x._meta.db_table
 
@@ -107,9 +84,48 @@ def get_tables_for_query(query):
     that query as a list.  Note that where clauses can have their own
     querysets with their own dependent queries, etc.
     """
+    from django.db.models.sql.where import WhereNode, SubqueryConstraint
+    from django.db.models.query import QuerySet
+    tables = set([v[0] for v in getattr(query,'alias_map',{}).values()])
+
+    def get_sub_query_tables(node):
+        query = node.query_object
+        if not hasattr(query, 'field_names'):
+            query = query.values(*node.targets)
+        else:
+            query = query._clone()
+        query = query.query
+        return set(v[0] for v in getattr(query, 'alias_map',{}).values())
+
+    def get_tables(node, tables):
+        if isinstance(node, SubqueryConstraint):
+            return get_sub_query_tables(node)
+        for child in node.children:
+            if isinstance(child, WhereNode):  # and child.children:
+                tables |= set(get_tables(child, tables))
+            elif not hasattr(child, '__iter__'):
+                continue
+            else:
+                for item in (c for c in child if isinstance(c, QuerySet)):
+                    tables |= get_tables_for_query(item.query)
+        return tables
+
+    if query.where and query.where.children:
+        where_nodes = [c for c in query.where.children if isinstance(c, (WhereNode, SubqueryConstraint))]
+        for node in where_nodes:
+            tables |= get_tables(node, tables)
+
+    return list(tables)
+
+def get_tables_for_query_pre_16(query):
+    """
+    Takes a Django 'query' object and returns all tables that will be used in
+    that query as a list.  Note that where clauses can have their own
+    querysets with their own dependent queries, etc.
+    """
     from django.db.models.sql.where import WhereNode
     from django.db.models.query import QuerySet
-    tables = [v[0] for v in getattr(query,'alias_map',{}).values()]
+    tables = set([v[0] for v in getattr(query,'alias_map',{}).values()])
 
     def get_tables(node, tables):
         for child in node.children:
@@ -119,29 +135,19 @@ def get_tables_for_query(query):
                 continue
             else:
                 for item in (c for c in child if isinstance(c, QuerySet)):
-                    tables += get_tables_for_query(item.query)
+                    tables |= set(get_tables_for_query(item.query))
         return tables
 
     if query.where and query.where.children:
         where_nodes = [c for c in query.where.children if isinstance(c, WhereNode)]
         for node in where_nodes:
-            tables += get_tables(node, tables)
+            tables |= get_tables(node, tables)
 
-    return list(set(tables))
+    return list(tables)
 
 
-def timer(func):
-    times = []
-
-    @wraps(func, assigned=available_attrs(func))
-    def foo(*args, **kwargs):
-        t0 = time.time()
-        ret = func(*args, **kwargs)
-        times.append(time.time() - t0)
-        print ("%d runs, %0.6f avg" %
-               (len(times), sum(times) / float(len(times))))
-        return ret
-    return foo
+if django.VERSION[:2] < (1, 6):
+    get_tables_for_query = get_tables_for_query_pre_16
 
 
 # The KeyGen is used only to generate keys.  Some of these keys will be used
@@ -156,15 +162,15 @@ class KeyGen(object):
 
     def random_generator(self):
         """Creates a random unique id."""
-        return self.gen_key(str(uuid4()))
+        return self.gen_key(force_bytes(uuid4()))
 
     def gen_table_key(self, table, db='default'):
         """
         Returns a key that is standard for a given table name and database
         alias. Total length up to 212 (max for memcache is 250).
         """
-        table = unicode(table)
-        db = unicode(settings.DB_CACHE_KEYS[db])
+        table = force_text(table)
+        db = force_text(settings.DB_CACHE_KEYS[db])
         if len(table) > 100:
             table = table[0:68] + self.gen_key(table[68:])
         if db and len(db) > 100:
@@ -180,9 +186,9 @@ class KeyGen(object):
 
     @staticmethod
     def _convert(x):
-        if isinstance(x, unicode):
+        if isinstance(x, text_type):
             return x.encode('utf-8')
-        return str(x)
+        return force_bytes(x)
 
     @staticmethod
     def _recursive_convert(x, key):
@@ -219,8 +225,8 @@ class KeyHandler(object):
         """Creates a random generation value for a single table name"""
         key = self.keygen.gen_table_key(table, db)
         val = self.cache_backend.get(key, None, db)
-        #if local.get('in_test', None): print str(val).ljust(32), key
-        if val == None:
+        #if local.get('in_test', None): print force_bytes(val).ljust(32), key
+        if val is None:
             val = self.keygen.random_generator()
             self.cache_backend.set(key, val, settings.MIDDLEWARE_SECONDS, db)
         return val
@@ -233,8 +239,8 @@ class KeyHandler(object):
             generations.append(self.get_single_generation(table, db))
         key = self.keygen.gen_multi_key(generations, db)
         val = self.cache_backend.get(key, None, db)
-        #if local.get('in_test', None): print str(val).ljust(32), key
-        if val == None:
+        #if local.get('in_test', None): print force_bytes(val).ljust(32), key
+        if val is None:
             val = self.keygen.random_generator()
             self.cache_backend.set(key, val, settings.MIDDLEWARE_SECONDS, db)
         return val
@@ -327,7 +333,6 @@ class QueryCacheBackend(object):
                     raise EmptyResultSet
             except EmptyResultSet:
                 if result_type == MULTI:
-                    # this was moved in 1.2 to compiler
                     return empty_iter()
                 else:
                     return
@@ -339,9 +344,15 @@ class QueryCacheBackend(object):
             tables = get_tables_for_query(cls.query)
             # if the tables are blacklisted, send a qc_skip signal
             blacklisted = disallowed_table(*tables)
+
+            try:
+                ordering_aliases = cls.ordering_aliases
+            except AttributeError:
+                ordering_aliases = cls.query.ordering_aliases
+
             if blacklisted:
                 signals.qc_skip.send(sender=cls, tables=tables,
-                    query=(sql, params, cls.query.ordering_aliases),
+                    query=(sql, params, ordering_aliases),
                     key=key)
             if tables and not blacklisted:
                 gen_key = self.keyhandler.get_generation(*tables, **{'db': db})
@@ -355,13 +366,13 @@ class QueryCacheBackend(object):
                     val = []
 
                 signals.qc_hit.send(sender=cls, tables=tables,
-                        query=(sql, params, cls.query.ordering_aliases),
+                        query=(sql, params, ordering_aliases),
                         size=len(val), key=key)
                 return val
 
             if not blacklisted:
                 signals.qc_miss.send(sender=cls, tables=tables,
-                    query=(sql, params, cls.query.ordering_aliases),
+                    query=(sql, params, ordering_aliases),
                     key=key)
 
             val = _get_original(original, cls, *args, **kwargs)
@@ -441,17 +452,12 @@ class QueryCacheBackend(object):
         self.cache_backend.unpatch()
         self._patched = False
 
-    def invalidate_m2m(self, instance, **kwargs):
-        if self._patched:
-            table = resolve_table(instance)
-            if not disallowed_table(table):
-                self.keyhandler.invalidate_table(instance)
-
     def invalidate(self, instance, **kwargs):
         if self._patched:
             table = resolve_table(instance)
+            using = kwargs.get('using', 'default')
             if not disallowed_table(table):
-                self.keyhandler.invalidate_table(table)
+                self.keyhandler.invalidate_table(table, db=using)
 
             tables = set()
             tables.add(table)
@@ -471,8 +477,6 @@ class QueryCacheBackend(object):
     def _handle_signals(self):
         post_save.connect(self.invalidate, sender=None)
         post_delete.connect(self.invalidate, sender=None)
-        # FIXME: only needed in 1.1?
-        signals.qc_m2m_change.connect(self.invalidate_m2m, sender=None)
 
     def flush_query_cache(self):
         from django.db import connection

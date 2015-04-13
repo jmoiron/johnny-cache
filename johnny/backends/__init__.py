@@ -11,11 +11,7 @@ for the exact usage you should use.
     .. _`cache backend monkey-patch`: http://github.com/mmalone/django-caching/blob/master/app/cache.py
     .. _`cache documentation`: http://docs.djangoproject.com/en/dev/topics/cache
 
-Example usage for various Django versions::
-
-    CACHE_BACKEND="johnny.backends.memcached//..." # django <= 1.2
-
-    CACHE_BACKEND="johnny.backends.memcached.MemcachedCache//..." # django > 1.2
+Example usage::
 
     CACHES = {
         'default' : {

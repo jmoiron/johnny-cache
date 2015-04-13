@@ -4,7 +4,6 @@ Infinite file-based caching.  Caches forever when passed timeout of 0.
 
 import sys
 
-import django
 from django.core.cache.backends import filebased
 
 # NOTE: We aren't using smart_str here, because the underlying library will
@@ -13,23 +12,15 @@ from django.core.cache.backends import filebased
 # names
 
 
-class CacheClass(filebased.CacheClass):
+class FileBasedCache(filebased.FileBasedCache):
     def add(self, key, value, timeout=None, **kwargs):
         if timeout is 0:
-            timeout = sys.maxint
-        return super(CacheClass, self).add(
+            timeout = sys.maxsize
+        return super(FileBasedCache, self).add(
             key, value, timeout=timeout, **kwargs)
 
     def set(self, key, value, timeout=None, **kwargs):
         if timeout is 0:
-            timeout = sys.maxint
-        return super(CacheClass, self).set(
+            timeout = sys.maxsize
+        return super(FileBasedCache, self).set(
             key, value, timeout=timeout, **kwargs)
-
-if django.VERSION[:2] > (1, 2):
-
-    class FileBasedCache(CacheClass):
-        """
-        File based cache named according to Django >= 1.3 conventions.
-        """
-        pass

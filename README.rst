@@ -1,3 +1,10 @@
+.. image:: https://travis-ci.org/jmoiron/johnny-cache.png
+  :target: https://travis-ci.org/jmoiron/johnny-cache
+
+.. image:: https://coveralls.io/repos/jmoiron/johnny-cache/badge.png
+  :target: https://coveralls.io/r/jmoiron/johnny-cache
+
+
 Johnny Cache is a caching framework for django_ applications.  It works with
 the django caching abstraction, but was developed specifically with the use of
 memcached_ in mind.  Its main feature is a patch on Django's ORM that

@@ -1,0 +1,85 @@
+language: python
+
+python:
+  - 2.6
+  - 2.7
+  - 3.2
+  - 3.3
+  - 3.4
+
+services:
+  - memcached
+  - redis-server
+
+env:
+  - DJANGO=1.3.7  PSYCOPG2=2.4.1 DJANGO_REDIS=a0806e34d1643887840cf3688933327b649c7a5a
+  - DJANGO=1.4.13 PSYCOPG2=2.5.2 DJANGO_REDIS=3.4
+  - DJANGO=1.5.8  PSYCOPG2=2.5.2 DJANGO_REDIS=3.4
+  - DJANGO=1.6.5  PSYCOPG2=2.5.2 DJANGO_REDIS=3.4
+
+install:
+  - pip install Django==$DJANGO psycopg2==$PSYCOPG2 coveralls
+  - pip install -e git+https://github.com/niwibe/django-redis@$DJANGO_REDIS#egg=django-redis
+  - pip install http://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-1.2.2.zip#egg=mysql
+  - if [[ $TRAVIS_PYTHON_VERSION == 3* ]];
+    then
+      pip install
+        python3-memcached
+        -e git+https://github.com/clelland/MySQL-for-Python-3#egg=MySQL-python;
+    else
+      pip install python-memcached MySQL-python;
+    fi
+
+before_script:
+  - psql -c 'CREATE DATABASE johnny_db;' -U postgres
+  - psql -c 'CREATE DATABASE johnny2_db;' -U postgres
+  - mysql -e 'CREATE DATABASE johnny_db;'
+  - mysql -e 'CREATE DATABASE johnny2_db;'
+
+script:
+  # Run against all database and cache backends, accumulating coverage stats.
+  - CACHE_BACKEND=memcached
+    coverage run --source=johnny manage.py test --traceback
+  - CACHE_BACKEND=redis
+    coverage run -a --source=johnny manage.py test --traceback
+
+  - DB_ENGINE=django.db.backends.postgresql_psycopg2 CACHE_BACKEND=memcached
+    coverage run -a --source=johnny manage.py test --traceback
+  - DB_ENGINE=django.db.backends.postgresql_psycopg2 CACHE_BACKEND=redis
+    coverage run -a --source=johnny manage.py test --traceback
+
+  - DB_ENGINE=django.db.backends.mysql CACHE_BACKEND=memcached
+    coverage run -a --source=johnny manage.py test --traceback
+  - DB_ENGINE=django.db.backends.mysql CACHE_BACKEND=redis
+    coverage run -a --source=johnny manage.py test --traceback
+
+  # Only run mysql-connector on Python 3 for now since it fails with many
+  # string-encoding errors when tested on Python 2.
+  - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; then
+        DB_ENGINE=mysql.connector.django CACHE_BACKEND=memcached
+        coverage run -a --source=johnny manage.py test --traceback
+    ; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; then
+        DB_ENGINE=mysql.connector.django CACHE_BACKEND=redis
+        coverage run -a --source=johnny manage.py test --traceback
+    ; fi
+
+
+after_success:
+  - coveralls
+
+matrix:
+  exclude:
+    # Django < 1.5 is not Python 3 compatible.
+    - python: 3.2
+      env: DJANGO=1.3.7  PSYCOPG2=2.4.1 DJANGO_REDIS=a0806e34d1643887840cf3688933327b649c7a5a
+    - python: 3.3
+      env: DJANGO=1.3.7  PSYCOPG2=2.4.1 DJANGO_REDIS=a0806e34d1643887840cf3688933327b649c7a5a
+    - python: 3.4
+      env: DJANGO=1.3.7  PSYCOPG2=2.4.1 DJANGO_REDIS=a0806e34d1643887840cf3688933327b649c7a5a
+    - python: 3.2
+      env: DJANGO=1.4.13 PSYCOPG2=2.5.2 DJANGO_REDIS=3.4
+    - python: 3.3
+      env: DJANGO=1.4.13 PSYCOPG2=2.5.2 DJANGO_REDIS=3.4
+    - python: 3.4
+      env: DJANGO=1.4.13 PSYCOPG2=2.5.2 DJANGO_REDIS=3.4

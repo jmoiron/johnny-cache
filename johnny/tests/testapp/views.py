@@ -4,7 +4,7 @@
 """Views for Johnny's testapp."""
 
 from django.shortcuts import render_to_response
-from models import *
+from .models import *
 
 def template_queries(request):
     """Render a simple template that will perform a query."""
