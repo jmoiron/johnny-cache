@@ -409,8 +409,14 @@ class QueryCacheBackend(object):
         self._read_compilers = (
             compiler.SQLCompiler,
             compiler.SQLAggregateCompiler,
-            compiler.SQLDateCompiler,
         )
+        
+        if hasattr(compiler, "SQLDateCompiler"):
+            #Support for django 1.8
+            self._read_compilers += (
+                compiler.SQLDateCompiler,
+            )
+    
         self._write_compilers = (
             compiler.SQLInsertCompiler,
             compiler.SQLDeleteCompiler,
