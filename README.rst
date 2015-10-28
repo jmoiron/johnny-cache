@@ -1,3 +1,6 @@
+Project no longer maintained! Use its successor instead, `django-cachalot <https://github.com/BertrandBordage/django-cachalot>`_.
+==================================================================================================================
+
 .. image:: https://travis-ci.org/jmoiron/johnny-cache.png
   :target: https://travis-ci.org/jmoiron/johnny-cache
 
