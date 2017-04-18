@@ -247,6 +247,9 @@ class KeyHandler(object):
         """Invalidates a table's generation and returns a new one
         (Note that this also invalidates all multi generations
         containing the table)"""
+        if (not settings.WHITELIST or table not in settings.WHITELIST) \
+                and table in settings.BLACKLIST:
+            return None
         key = self.keygen.gen_table_key(table, db)
         val = self.keygen.random_generator()
         self.cache_backend.set(key, val, settings.MIDDLEWARE_SECONDS, db)
