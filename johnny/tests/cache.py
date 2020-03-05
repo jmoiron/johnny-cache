@@ -226,7 +226,7 @@ class MultiDbTest(TransactionQueryCacheBase):
         with self.assertNumQueries(1, using='second'):
             g2 = Genre.objects.using("second").get(pk=1)
 
-        #other thread sould now be accessing the cache after the get
+        #other thread should now be accessing the cache after the get
         #from the commit.
         other("Genre.objects.using('second').get(pk=1)")
         hit, ostart = q.get()
